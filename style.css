@@ -78,9 +78,21 @@ body.dark {
   --shadow-panel: -6px 0 32px rgba(0,0,0,0.5);
 
   --progress-bg:  transparent;
-  --progress-bar: #c8956a;
+}
 
-  --overlay:      rgba(0,0,0,0.6);
+/* Dark mode - more visible highlighted character spans in EPUB */
+body.dark #epubViewer span[data-char-name] {
+  opacity: 1 !important;
+}
+
+/* Ensure underline style is more visible in dark mode - thicker and more opaque */
+body.dark #epubViewer span[data-char-name][style*="border-bottom"] {
+  border-bottom-width: 4px !important;
+}
+
+/* Dark mode - stronger contrast for solid and ombre styles */
+body.dark #epubViewer span[data-char-name][style*="background"] {
+  filter: brightness(1.2) saturate(1.3);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -108,6 +120,58 @@ body {
   max-width: 800px;
   margin: 0 auto;
   padding: 0 20px 80px;
+}
+
+/* Home screen dark mode toggle */
+.home-dark-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-chip);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.2s;
+  z-index: 100;
+}
+
+.home-dark-toggle:hover {
+  background: var(--bg-chip-hover);
+  transform: scale(1.05);
+}
+
+/* Show/hide sun and moon icons */
+.icon-sun, .icon-moon {
+  display: none;
+}
+.icon-moon {
+  display: block;
+}
+body.dark .icon-sun {
+  display: block;
+}
+body.dark .icon-moon {
+  display: none;
+}
+
+/* Button label - default shows "Light Mode", dark mode shows "Dark Mode" */
+.btn-label {
+  display: inline;
+}
+
+/* Dark mode button in settings */
+#darkModeBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#darkModeBtn .btn-label {
+  margin-left: 4px;
 }
 
 #homeHero {
@@ -285,6 +349,18 @@ body {
   height: 100dvh;
   background: var(--bg);
   overflow: hidden;
+  border-radius: 20px;
+  margin: 8px;
+  max-width: calc(100vw - 16px);
+}
+
+/* On mobile, remove the rounded corners and margin */
+@media (max-width: 680px) {
+  #reader {
+    border-radius: 0;
+    margin: 0;
+    max-width: 100vw;
+  }
 }
 
 /* Top bar */
@@ -343,6 +419,7 @@ body {
   overflow: hidden;
   position: relative;
   min-height: 0;
+  padding: 8px;
 }
 
 #readingContent {
@@ -352,6 +429,9 @@ body {
   align-items: flex-start;
   justify-content: center;
   min-width: 0;
+  background: var(--bg-card);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
 }
 
 /* Nav arrows */
@@ -371,7 +451,7 @@ body {
   user-select: none;
   z-index: 10;
   height: 100%;
-  border-radius: 0;
+  border-radius: 16px;
   line-height: 1;
 }
 body.dark .nav-arrow { color: rgba(200,180,150,0.2); }
@@ -679,45 +759,126 @@ body.dark .font-select {
 /* ============================================================
    INLINE COLOR PICKER
    ============================================================ */
-#inlineColorPicker {
-  display: none;
-  position: fixed;
-  background: var(--bg-popup);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px 20px 16px;
-  box-shadow: var(--shadow-popup);
-  z-index: 9999;
-  text-align: left;
-  min-width: 220px;
-}
+ #inlineColorPicker {
+   display: none;
+   position: fixed;
+   background: var(--bg-popup);
+   border: 1px solid var(--border);
+   border-radius: 24px;
+   padding: 22px 24px 20px;
+   box-shadow: var(--shadow-popup);
+   z-index: 9999;
+   text-align: left;
+   min-width: 260px;
+   cursor: move;
+   user-select: none;
+ }
+ 
+ #inlineColorPicker:active {
+   cursor: grabbing;
+ }
 
-#inlineCharName {
-  font-size: 1em;
-  color: var(--text);
-}
+ #inlineCharName {
+   font-size: 1.05em;
+   color: var(--text);
+ }
 
-#styleOptions {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-top: 12px;
-  font-size: 0.88em;
-  color: var(--text);
-}
-#styleOptions label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-}
+ /* Pastel color palette - rounded swatches */
+ #colorPalette {
+   display: grid;
+   grid-template-columns: repeat(6, 1fr);
+   gap: 10px;
+   margin: 14px 0;
+ }
+ 
+ .color-swatch {
+   width: 36px;
+   height: 36px;
+   border-radius: 50%;
+   border: 2px solid transparent;
+   cursor: pointer;
+   transition: transform 0.15s, border-color 0.15s;
+   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+ }
+ .color-swatch:hover {
+   transform: scale(1.1);
+ }
+ .color-swatch.selected {
+   border-color: var(--accent);
+   transform: scale(1.15);
+ }
 
-/* Icon options row */
-#iconOptions {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-top: 10px;
+ /* Custom color input */
+ #customColorRow {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   margin-top: 12px;
+   padding-top: 12px;
+   border-top: 1px solid var(--border-light);
+ }
+ #customColorRow label {
+   font-size: 0.85em;
+   color: var(--text-muted);
+ }
+ #customColorRow input[type="color"] {
+   width: 36px;
+   height: 36px;
+   border: none;
+   border-radius: 10px;
+   cursor: pointer;
+   padding: 0;
+ }
+
+ /* Settings color palette */
+ #settingsColorPalette {
+   display: grid;
+   grid-template-columns: repeat(6, 1fr);
+   gap: 8px;
+   margin: 10px 0;
+ }
+ 
+ #settingsCustomColorRow {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   margin-top: 10px;
+   margin-bottom: 12px;
+ }
+ #settingsCustomColorRow label {
+   font-size: 0.85em;
+   color: var(--text-muted);
+ }
+ #settingsCustomColorRow input[type="color"] {
+   width: 36px;
+   height: 36px;
+   border: none;
+   border-radius: 10px;
+   cursor: pointer;
+   padding: 0;
+ }
+
+ #styleOptions {
+   display: flex;
+   flex-direction: column;
+   gap: 7px;
+   margin-top: 12px;
+   font-size: 0.88em;
+   color: var(--text);
+ }
+ #styleOptions label {
+   display: flex;
+   align-items: center;
+   gap: 7px;
+   cursor: pointer;
+ }
+
+ /* Icon options row */
+ #iconOptions {
+   display: flex;
+   flex-direction: column;
+   gap: 7px;
+   margin-top: 10px;
   font-size: 0.88em;
   color: var(--text);
 }
@@ -794,4 +955,42 @@ body.dark .font-select {
 
 @media (min-width: 900px) {
   #libraryGrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+/* ============================================================
+   TOUCH DEVICE IMPROVEMENTS (iOS/iPad)
+   ============================================================ */
+
+/* Ensure highlighted character spans are tappable */
+#epubViewer span[data-char-name] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(90, 62, 40, 0.2);
+  cursor: pointer;
+  position: relative;
+}
+
+/* Increase touch target size on mobile */
+@media (hover: none) and (pointer: coarse) {
+  #epubViewer span[data-char-name] {
+    padding: 2px 1px;
+    margin: -2px -1px;
+  }
+  
+  /* Make character list items more tappable */
+  #characterList > div {
+    padding: 10px 8px;
+    min-height: 44px;
+  }
+  
+  /* Larger touch targets for inline picker buttons */
+  #inlineApply, #inlineClose {
+    min-height: 44px;
+    padding: 12px 20px;
+  }
+  
+  /* Ensure color picker is touch-friendly */
+  #inlineColorPicker input[type="color"] {
+    width: 60px;
+    height: 44px;
+  }
 }

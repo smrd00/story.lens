@@ -25,6 +25,12 @@
 
 <!-- ========== HOME SCREEN ========== -->
 <div id="homeScreen">
+  <!-- Dark mode toggle in top right -->
+  <button id="homeDarkModeBtn" class="home-dark-toggle" title="Toggle dark mode">
+    <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  </button>
+  
   <div id="homeHero">
     <div id="homeLogo">
       
@@ -111,7 +117,11 @@
 
       <section>
         <h3>Appearance</h3>
-        <button id="darkModeBtn">🌙 Dark Mode</button>
+        <button id="darkModeBtn">
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <span class="btn-label">Light Mode</span>
+        </button>
       </section>
 
       <section>
@@ -139,7 +149,11 @@
       <section>
         <h3>Character Colour</h3>
         <p class="settings-hint">Tap a character name in the text, or pick one from the list on the left.</p>
-        <input type="color" id="colorPicker" value="#ff0000">
+        <div id="settingsColorPalette"></div>
+        <div id="settingsCustomColorRow">
+          <label>Custom:</label>
+          <input type="color" id="colorPicker" value="#ff0000">
+        </div>
         <button id="saveColor">Apply Colour</button>
       </section>
 
@@ -150,8 +164,14 @@
 <!-- Inline color picker popup (shown when clicking/tapping a name) -->
 <div id="inlineColorPicker">
   <strong id="inlineCharName"></strong>
-  <br><br>
-  <input type="color" id="inlineColor" value="#ff0000">
+  <br>
+  <!-- Pastel color palette -->
+  <div id="colorPalette"></div>
+  <!-- Custom color option -->
+  <div id="customColorRow">
+    <label>Custom:</label>
+    <input type="color" id="inlineColor" value="#ff0000">
+  </div>
   <div id="styleOptions">
     <label><input type="radio" name="inlineStyle" value="underline" checked> Dashed underline</label>
     <label><input type="radio" name="inlineStyle" value="solid"> Full colour</label>
