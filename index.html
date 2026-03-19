@@ -3,10 +3,13 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>StoryLens</title>
 
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Coda:wght@400;700&family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
 
 <!-- PDF.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -20,29 +23,65 @@
 
 <body>
 
-<h1>StoryLens</h1>
+<!-- ========== HOME SCREEN ========== -->
+<div id="homeScreen">
+  <div id="homeHero">
+    <div id="homeLogo">
+      
+      <img src="logo.svg" alt="StoryLens logo" width="140" height="110" id="customLogo" onerror="this.style.display='none'">
+    </div>
+    <h1>StoryLens</h1>
+    <p id="homeSubtitle">Your personal reading companion.<br>Track characters, adjust fonts, and read comfortably.</p>
 
-<div id="uploadScreen">
-  <input type="file" id="fileUpload" accept=".pdf,.epub">
-  <button id="openBtn">Open Book</button>
-</div>
-
-<div id="reader" style="display:none;">
-
-  <!-- Top bar: save + settings -->
-  <div class="top-bar">
-    <button id="savePageBtn" title="Save current position">🔖 Save Page</button>
-    <button id="settingsBtn" title="Settings">⚙️ Settings</button>
+    <label id="uploadBtn" for="fileUpload">
+       Open a Book
+      <input type="file" id="fileUpload" accept=".pdf,.epub">
+    </label>
   </div>
 
-  <canvas id="pdfCanvas" style="display:none;"></canvas>
-  <div id="epubViewer" style="display:none;"></div>
+  <div id="librarySection">
+    <h2 id="libraryTitle">My Library</h2>
+    <p id="libraryEmpty" style="display:none;">No books yet — upload one above to get started.</p>
+    <div id="libraryGrid"></div>
+  </div>
+</div>
 
-  <!-- Navigation below reader -->
-  <div class="navigation">
-    <button id="prevBtn">◀ Prev</button>
-    <span id="pageInfo">0% read</span>
-    <button id="nextBtn">Next ▶</button>
+<!-- ========== READER ========== -->
+<div id="reader" style="display:none;">
+
+  <!-- Logo at top of reader -->
+  <div id="readerLogo">
+    <img src="logo.svg" alt="StoryLens logo" width="80" height="60" id="readerCustomLogo" onerror="this.style.display='none'">
+  </div>
+
+  <!-- Top bar: back + title + save + settings -->
+  <div class="top-bar">
+    <button id="backBtn" class="top-btn back-btn" title="Back to library">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <span id="currentBookTitle" class="book-title-bar"></span>
+    <button id="savePageBtn" class="top-btn" title="Save current position">🔖</button>
+    <button id="settingsBtn" class="top-btn" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
+  </div>
+
+  <!-- Reading area with floating arrows -->
+  <div id="readingArea">
+    <button id="prevBtn" class="nav-arrow nav-prev" title="Previous page">&#8249;</button>
+
+    <div id="readingContent">
+      <canvas id="pdfCanvas" style="display:none;"></canvas>
+      <div id="epubViewer" style="display:none;"></div>
+    </div>
+
+    <button id="nextBtn" class="nav-arrow nav-next" title="Next page">&#8250;</button>
+  </div>
+
+  <!-- Progress bar -->
+  <div id="progressBar">
+    <div id="progressFill"></div>
+    <span id="pageInfo">—</span>
   </div>
 
 </div>
@@ -58,50 +97,87 @@
       </div>
       <div id="characterPanel">
         <h3>Characters</h3>
+        <p class="sidebar-hint">Tap a name to set its colour. Long-press or select any word in the text to add it.</p>
         <div id="characterList"></div>
       </div>
     </div>
 
     <!-- Right panel: settings controls -->
     <div id="settingsControls">
-      <button id="settingsClose" title="Close">✕</button>
+      <button id="settingsClose" title="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
       <h2>Settings</h2>
 
       <section>
+        <h3>Appearance</h3>
+        <button id="darkModeBtn">🌙 Dark Mode</button>
+      </section>
+
+      <section>
         <h3>Font</h3>
-        <button id="fontToggleBtn">Switch to OpenDyslexic</button>
+        <select id="fontSelect" class="font-select">
+          <option value="default">Default (Serif)</option>
+          <option value="literata">Literata</option>
+          <option value="merriweather">Merriweather</option>
+          <option value="lora">Lora</option>
+          <option value="atkinson">Atkinson Hyperlegible</option>
+          <option value="opendyslexic">OpenDyslexic</option>
+        </select>
       </section>
 
       <section>
         <h3>Text Size</h3>
-        <input type="range" id="fontSizeSlider" min="80" max="200" value="100" step="5">
-        <span id="fontSizeValue">100%</span>
+        <div class="slider-row">
+          <span class="slider-label-sm">A</span>
+          <input type="range" id="fontSizeSlider" min="80" max="200" value="100" step="5">
+          <span class="slider-label-lg">A</span>
+          <span id="fontSizeValue">100%</span>
+        </div>
       </section>
 
       <section>
-        <h3>Character Color</h3>
-        <p style="font-size:0.85em;color:#777;margin:0 0 8px;">Click a character name in the text, or select one from the list on the left.</p>
+        <h3>Character Colour</h3>
+        <p class="settings-hint">Tap a character name in the text, or pick one from the list on the left.</p>
         <input type="color" id="colorPicker" value="#ff0000">
-        <button id="saveColor">Apply Color</button>
+        <button id="saveColor">Apply Colour</button>
       </section>
 
     </div>
   </div>
 </div>
 
-<!-- Inline color picker popup (shown when clicking a name in text) -->
+<!-- Inline color picker popup (shown when clicking/tapping a name) -->
 <div id="inlineColorPicker">
   <strong id="inlineCharName"></strong>
   <br><br>
   <input type="color" id="inlineColor" value="#ff0000">
   <div id="styleOptions">
-    <label><input type="radio" name="inlineStyle" value="underline"> Dashed underline</label>
-    <label><input type="radio" name="inlineStyle" value="solid"> Full color</label>
+    <label><input type="radio" name="inlineStyle" value="underline" checked> Dashed underline</label>
+    <label><input type="radio" name="inlineStyle" value="solid"> Full colour</label>
     <label><input type="radio" name="inlineStyle" value="ombre"> Ombre</label>
   </div>
+  <div id="iconOptions">
+    <label><input type="radio" name="inlineIcon" value="none" checked> No icon</label>
+    <label><input type="radio" name="inlineIcon" value="star"> ★ Star</label>
+    <label><input type="radio" name="inlineIcon" value="dot"> ● Dot</label>
+    <label><input type="radio" name="inlineIcon" value="triangle"> ▲ Triangle</label>
+    <label><input type="radio" name="inlineIcon" value="diamond"> ◆ Diamond</label>
+  </div>
   <br>
-  <button id="inlineApply">Apply</button>
-  <button id="inlineClose">Cancel</button>
+  <div class="picker-actions">
+    <button id="inlineApply" class="btn-primary">Apply</button>
+    <button id="inlineClose" class="btn-ghost">Cancel</button>
+  </div>
+</div>
+
+<!-- "Add as character?" prompt (shown when user selects unknown text) -->
+<div id="addCharPrompt">
+  <span id="addCharWord"></span>
+  <div class="prompt-actions">
+    <button id="addCharConfirm" class="btn-primary">Add & Colour</button>
+    <button id="addCharDismiss" class="btn-ghost">Dismiss</button>
+  </div>
 </div>
 
 <script src="app.js"></script>
