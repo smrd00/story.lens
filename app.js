@@ -383,7 +383,12 @@ function loadEPUB(arrayBuffer, filename) {
         ds.id = "sl-dark-style";
         contents.document.head.appendChild(ds);
       }
-      ds.textContent = "body,html{background:#1a1612!important;color:#e8dfd0!important}";
+      // Dark mode styles with more visible highlights
+      ds.textContent = `
+        body,html{background:#1a1612!important;color:#e8dfd0!important}
+        span[data-char-name]{opacity:1!important}
+        span[data-char-name][style*="border-bottom"]{border-bottom-color:inherit!important}
+      `;
     }
   });
 
@@ -764,17 +769,23 @@ function applySpanStyle(span, color, style, icon) {
   if (color) {
     if (style === "solid") {
       span.style.background    = color;
-      span.style.color         = "#fff";
-      span.style.padding       = "2px 4px";
-      span.style.borderRadius  = "3px";
+      // Use black text for better contrast on vibrant colors in light mode
+      span.style.color         = "#000000";
+      span.style.textShadow    = "0 0 2px rgba(255,255,255,0.5)";
+      span.style.padding       = "3px 6px";
+      span.style.borderRadius  = "8px"; // More rounded corners
     } else if (style === "ombre") {
-      span.style.backgroundImage  = "linear-gradient(to top, " + color + "cc 0%, transparent 100%)";
+      span.style.backgroundImage  = "linear-gradient(to top, " + color + "dd 0%, transparent 100%)";
       span.style.backgroundRepeat = "no-repeat";
       span.style.backgroundSize   = "100% 100%";
-      span.style.padding          = "2px 4px";
+      span.style.padding          = "3px 6px";
+      span.style.borderRadius     = "8px"; // More rounded corners
+      span.style.color            = "#000000";
     } else {
-      span.style.borderBottom  = "2px dashed " + color;
-      span.style.paddingBottom = "1px";
+      // Rounded underline style - thicker and more visible
+      span.style.borderBottom  = "4px dashed " + color;
+      span.style.paddingBottom = "3px";
+      span.style.borderRadius  = "4px";
     }
   }
 
@@ -793,19 +804,49 @@ function applySpanStyle(span, color, style, icon) {
   }
 }
 
+// Helper function to adjust color brightness for better text contrast
+function adjustColorBrightness(hex, percent) {
+  // Remove # if present
+  hex = hex.replace(/^#/, '');
+  
+  // Parse the hex color
+  let r = parseInt(hex.substring(0, 2), 16);
+  let g = parseInt(hex.substring(2, 4), 16);
+  let b = parseInt(hex.substring(4, 6), 16);
+  
+  // Adjust brightness
+  r = Math.min(255, Math.max(0, r + percent));
+  g = Math.min(255, Math.max(0, g + percent));
+  b = Math.min(255, Math.max(0, b + percent));
+  
+  // Convert back to hex
+  return "#" + 
+    r.toString(16).padStart(2, '0') + 
+    g.toString(16).padStart(2, '0') + 
+    b.toString(16).padStart(2, '0');
+}
+
 function attachSpanHandlers(s) {
   function handleActivation(e) {
     e.stopPropagation();
     const charName = s.dataset.charName;
-    let absX = e.clientX, absY = e.clientY;
+    let absX, absY;
 
-    // Handle touch events
-    if (e.touches && e.touches.length > 0) {
-      absX = e.touches[0].clientX;
-      absY = e.touches[0].clientY;
-    } else if (e.changedTouches && e.changedTouches.length > 0) {
-      absX = e.changedTouches[0].clientX;
-      absY = e.changedTouches[0].clientY;
+    // Handle touch events first (for iOS)
+    if (e.type === "touchstart" || e.type === "touchend") {
+      const touch = e.changedTouches && e.changedTouches.length > 0 
+        ? e.changedTouches[0] 
+        : (e.touches && e.touches.length > 0 ? e.touches[0] : null);
+      if (touch) {
+        absX = touch.clientX;
+        absY = touch.clientY;
+      }
+    }
+    
+    // Fall back to mouse/click coordinates
+    if (absX === undefined || absY === undefined) {
+      absX = e.clientX;
+      absY = e.clientY;
     }
 
     try {
@@ -825,11 +866,56 @@ function attachSpanHandlers(s) {
     opener(charName, absX, absY);
   }
 
-  s.addEventListener("click",    handleActivation);
+  // Use pointer events for better cross-device support
+  s.style.touchAction = "manipulation";
+  
+  // Add touchstart for immediate response on iOS
+  s.addEventListener("touchstart", function(e) {
+    e.stopPropagation();
+    // Store touch coordinates for use in touchend
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      s._touchStartX = e.changedTouches[0].clientX;
+      s._touchStartY = e.changedTouches[0].clientY;
+    }
+  }, { passive: true });
+  
   s.addEventListener("touchend", function(e) {
-    e.preventDefault(); // prevent ghost click
-    handleActivation(e);
+    e.preventDefault();
+    e.stopPropagation();
+    
+    let absX, absY;
+    // Use stored touch coordinates or current
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      absX = e.changedTouches[0].clientX;
+      absY = e.changedTouches[0].clientY;
+    } else if (s._touchStartX !== undefined) {
+      absX = s._touchStartX;
+      absY = s._touchStartY;
+    }
+    
+    if (absX !== undefined && absY !== undefined) {
+      const charName = s.dataset.charName;
+      
+      try {
+        const iframes = window.parent.document.querySelectorAll("iframe");
+        iframes.forEach(function(iframe) {
+          if (iframe.contentWindow === window) {
+            const rect = iframe.getBoundingClientRect();
+            absX += rect.left;
+            absY += rect.top;
+          }
+        });
+      } catch(err) {}
+
+      const opener = (window.parent && window.parent.openInlineColorPicker)
+        ? window.parent.openInlineColorPicker
+        : openInlineColorPicker;
+      opener(charName, absX, absY);
+    }
   }, { passive: false });
+  
+  // Keep click handler as fallback for non-touch devices
+  s.addEventListener("click", handleActivation);
 }
 
 function escapeRegex(str) {
@@ -856,10 +942,48 @@ function injectCapitalWordClicker(contents) {
   if (doc._capitalTouchHandler) {
     doc.removeEventListener("touchend", doc._capitalTouchHandler);
   }
+  
+  // Store touch start position for better iOS handling
+  let touchStartX = 0;
+  let touchStartY = 0;
+  
+  if (doc._touchStartHandler) {
+    doc.removeEventListener("touchstart", doc._touchStartHandler);
+  }
+  doc._touchStartHandler = function(e) {
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      touchStartX = e.changedTouches[0].clientX;
+      touchStartY = e.changedTouches[0].clientY;
+    }
+  };
+  doc.addEventListener("touchstart", doc._touchStartHandler, { passive: true });
+  
   doc._capitalTouchHandler = function(e) {
+    // Check if this is a tap (not a swipe) - minimal movement
+    let dx = 0, dy = 0;
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
+      dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+    }
+    // Only handle as tap if movement is minimal
+    if (dx < 10 && dy < 10) {
+      e.preventDefault();
+    }
     handleWordInteraction(e, contents, "touch");
   };
   doc.addEventListener("touchend", doc._capitalTouchHandler, { passive: false });
+  
+  // Also add click handler for iOS Safari which sometimes converts taps to clicks
+  if (doc._capitalTapHandler) {
+    doc.removeEventListener("click", doc._capitalTapHandler);
+  }
+  doc._capitalTapHandler = function(e) {
+    // Only handle if target is text content (not already a highlighted span)
+    if (e.target && e.target.dataset && e.target.dataset.charName) return;
+    if (e.target && (e.target.tagName === 'SPAN' || e.target.tagName === 'DIV')) return;
+    handleWordInteraction(e, contents, "mouse");
+  };
+  doc.addEventListener("click", doc._capitalTapHandler);
 }
 
 function handleWordInteraction(e, contents, mode) {
@@ -996,11 +1120,175 @@ document.getElementById("addCharDismiss").addEventListener("click", function() {
 // ============================================================
 let inlineTargetChar = null;
 
+// Vibrant color palette - high distinction for character identification
+const PASTEL_COLORS = [
+  "#E57373", // soft red
+  "#FFB74D", // soft orange
+  "#FFF176", // soft yellow
+  "#81C784", // soft green
+  "#64B5F6", // soft blue
+  "#BA68C8", // soft purple
+  "#F06292", // soft pink
+  "#4DD0E1", // soft cyan
+  "#AED581", // soft lime
+  "#FF8A65", // soft deep orange
+  "#9575CD", // soft deep purple
+  "#A1887F", // soft brown
+];
+
+// Initialize color palette on page load
+function initColorPalette() {
+  const palette = document.getElementById("colorPalette");
+  if (!palette) return;
+  palette.innerHTML = "";
+  
+  PASTEL_COLORS.forEach(color => {
+    const swatch = document.createElement("div");
+    swatch.className = "color-swatch";
+    swatch.style.backgroundColor = color;
+    swatch.dataset.color = color;
+    swatch.title = color;
+    
+    swatch.addEventListener("click", function() {
+      // Update selection state
+      document.querySelectorAll(".color-swatch").forEach(s => s.classList.remove("selected"));
+      swatch.classList.add("selected");
+      // Update color input
+      document.getElementById("inlineColor").value = color;
+    });
+    
+    // Touch support
+    swatch.addEventListener("touchstart", function(e) {
+      e.preventDefault();
+      document.querySelectorAll(".color-swatch").forEach(s => s.classList.remove("selected"));
+      swatch.classList.add("selected");
+      document.getElementById("inlineColor").value = color;
+    }, { passive: false });
+    
+    palette.appendChild(swatch);
+  });
+}
+
+// ============================================================
+//  DRAG FUNCTIONALITY FOR INLINE COLOR PICKER
+// ============================================================
+(function() {
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  const picker = document.getElementById("inlineColorPicker");
+  
+  if (!picker) return;
+  
+  // Mouse events
+  picker.addEventListener("mousedown", function(e) {
+    // Don't drag if clicking on buttons or inputs
+    if (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || e.target.closest("button") || e.target.closest("input")) {
+      return;
+    }
+    isDragging = true;
+    dragOffsetX = e.clientX - picker.offsetLeft;
+    dragOffsetY = e.clientY - picker.offsetTop;
+    picker.style.cursor = "grabbing";
+  });
+  
+  document.addEventListener("mousemove", function(e) {
+    if (!isDragging) return;
+    let newX = e.clientX - dragOffsetX;
+    let newY = e.clientY - dragOffsetY;
+    
+    // Keep within viewport
+    newX = Math.max(0, Math.min(newX, window.innerWidth - picker.offsetWidth));
+    newY = Math.max(0, Math.min(newY, window.innerHeight - picker.offsetHeight));
+    
+    picker.style.left = newX + "px";
+    picker.style.top = newY + "px";
+  });
+  
+  document.addEventListener("mouseup", function() {
+    if (isDragging) {
+      isDragging = false;
+      picker.style.cursor = "move";
+    }
+  });
+  
+  // Touch events for mobile/tablet
+  picker.addEventListener("touchstart", function(e) {
+    // Don't drag if touching buttons or inputs
+    if (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || e.target.closest("button") || e.target.closest("input")) {
+      return;
+    }
+    const touch = e.touches[0];
+    isDragging = true;
+    dragOffsetX = touch.clientX - picker.offsetLeft;
+    dragOffsetY = touch.clientY - picker.offsetTop;
+  }, { passive: true });
+  
+  picker.addEventListener("touchmove", function(e) {
+    if (!isDragging) return;
+    e.preventDefault(); // Prevent scrolling while dragging
+    const touch = e.touches[0];
+    let newX = touch.clientX - dragOffsetX;
+    let newY = touch.clientY - dragOffsetY;
+    
+    // Keep within viewport
+    newX = Math.max(0, Math.min(newX, window.innerWidth - picker.offsetWidth));
+    newY = Math.max(0, Math.min(newY, window.innerHeight - picker.offsetHeight));
+    
+    picker.style.left = newX + "px";
+    picker.style.top = newY + "px";
+  }, { passive: false });
+  
+  picker.addEventListener("touchend", function() {
+    isDragging = false;
+  });
+})();
+
+// Initialize on load
+initColorPalette();
+initSettingsColorPalette();
+
+function initSettingsColorPalette() {
+  const palette = document.getElementById("settingsColorPalette");
+  if (!palette) return;
+  palette.innerHTML = "";
+  
+  PASTEL_COLORS.forEach(color => {
+    const swatch = document.createElement("div");
+    swatch.className = "color-swatch";
+    swatch.style.backgroundColor = color;
+    swatch.dataset.color = color;
+    swatch.title = color;
+    
+    swatch.addEventListener("click", function() {
+      document.querySelectorAll("#settingsColorPalette .color-swatch").forEach(s => s.classList.remove("selected"));
+      swatch.classList.add("selected");
+      document.getElementById("colorPicker").value = color;
+    });
+    
+    swatch.addEventListener("touchstart", function(e) {
+      e.preventDefault();
+      document.querySelectorAll("#settingsColorPalette .color-swatch").forEach(s => s.classList.remove("selected"));
+      swatch.classList.add("selected");
+      document.getElementById("colorPicker").value = color;
+    }, { passive: false });
+    
+    palette.appendChild(swatch);
+  });
+}
+
 window.openInlineColorPicker = function openInlineColorPicker(name, x, y) {
   inlineTargetChar = name;
   const picker = document.getElementById("inlineColorPicker");
   document.getElementById("inlineCharName").textContent = name;
-  document.getElementById("inlineColor").value = characterColors[name] || "#ff0000";
+  
+  const savedColor = characterColors[name] || "#ff0000";
+  document.getElementById("inlineColor").value = savedColor;
+  
+  // Update palette selection
+  document.querySelectorAll(".color-swatch").forEach(s => {
+    s.classList.toggle("selected", s.dataset.color.toLowerCase() === savedColor.toLowerCase());
+  });
 
   const savedStyle = characterStyles[name] || "underline";
   document.querySelectorAll('input[name="inlineStyle"]').forEach(function(r) {
@@ -1012,7 +1300,7 @@ window.openInlineColorPicker = function openInlineColorPicker(name, x, y) {
     r.checked = r.value === savedIcon;
   });
 
-  const pw = 260, ph = 320;
+  const pw = 280, ph = 380;
   const vw = window.innerWidth, vh = window.innerHeight;
   picker.style.left    = Math.min(x + 8, vw - pw) + "px";
   picker.style.top     = Math.min(y + 8, vh - ph) + "px";
@@ -1063,14 +1351,20 @@ document.addEventListener("click", function(e) {
 // ============================================================
 (function() {
   const btn = document.getElementById("darkModeBtn");
+  const homeBtn = document.getElementById("homeDarkModeBtn");
   const saved = localStorage.getItem("sl_darkMode");
   if (saved === "1") {
     document.body.classList.add("dark");
-    btn.textContent = "☀️ Light Mode";
+    const btnLabel = document.querySelector("#darkModeBtn .btn-label");
+    if (btnLabel) btnLabel.textContent = "Dark Mode";
   }
-  btn.addEventListener("click", function() {
+   
+  function toggleDarkMode() {
     const isDark = document.body.classList.toggle("dark");
-    btn.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+    // Update button labels
+    const btnLabel = document.querySelector("#darkModeBtn .btn-label");
+    if (btnLabel) btnLabel.textContent = isDark ? "Dark Mode" : "Light Mode";
+    // Icons are toggled via CSS based on body.dark class
     localStorage.setItem("sl_darkMode", isDark ? "1" : "0");
     // Re-inject dark background into EPUB iframe if open
     if (rendition) {
@@ -1082,13 +1376,21 @@ document.addEventListener("click", function(e) {
             style.id = "sl-dark-style";
             contents.document.head.appendChild(style);
           }
-          style.textContent = "body,html{background:#1a1612!important;color:#e8dfd0!important}";
+          // Dark mode styles with more visible highlights
+          style.textContent = `
+            body,html{background:#1a1612!important;color:#e8dfd0!important}
+            span[data-char-name]{opacity:1!important}
+            span[data-char-name][style*="border-bottom"]{border-bottom-color:inherit!important}
+          `;
         } else {
           if (style) style.remove();
         }
       });
     }
-  });
+  }
+  
+  if (btn) btn.addEventListener("click", toggleDarkMode);
+  if (homeBtn) homeBtn.addEventListener("click", toggleDarkMode);
 })();
 
 // ============================================================
