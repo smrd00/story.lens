@@ -1318,18 +1318,42 @@ function injectCapitalWordClicker(contents) {
     handleWordInteraction(e, contents, "touch");
   };
   doc.addEventListener("touchend", doc._capitalTouchHandler, { passive: false });
-  
+   
   // Also add click handler for iOS Safari which sometimes converts taps to clicks
   if (doc._capitalTapHandler) {
     doc.removeEventListener("click", doc._capitalTapHandler);
   }
   doc._capitalTapHandler = function(e) {
+    // Check if clicking on an already colored character - show color picker
+    if (e.target && e.target.dataset && e.target.dataset.charName) {
+      const name = e.target.dataset.charName;
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Get position for popup
+      const rect = e.target.getBoundingClientRect();
+      const iframe = document.getElementById("epubViewer").querySelector("iframe");
+      let iframeX = 0, iframeY = 0;
+      if (iframe) {
+        const ifRect = iframe.getBoundingClientRect();
+        iframeX = ifRect.left;
+        iframeY = ifRect.top;
+      }
+      
+      // Show the inline color picker for this character
+      openInlineColorPicker(name, rect.left + iframeX, rect.bottom + iframeY);
+      return;
+    }
+    
     // Only handle if target is text content (not already a highlighted span)
-    if (e.target && e.target.dataset && e.target.dataset.charName) return;
     if (e.target && (e.target.tagName === 'SPAN' || e.target.tagName === 'DIV')) return;
-    handleWordInteraction(e, contents, "mouse");
+    
+    // Use setTimeout to ensure selection is properly handled
+    setTimeout(function() {
+      handleWordInteraction(e, contents, "mouse");
+    }, 10);
   };
-  doc.addEventListener("click", doc._capitalTapHandler);
+  doc.addEventListener("click", doc._capitalTapHandler, { passive: true });
 }
 
 function handleWordInteraction(e, contents, mode) {
@@ -1415,9 +1439,30 @@ function handleWordInteraction(e, contents, mode) {
   } catch(err) {}
 
   if (!word) return;
-  // Must start with capital, be at least 3 chars, not already listed
+  // Must start with capital, be at least 3 chars
   if (!/^[A-Z][a-z]{2,}$/.test(word)) return;
-  if (detectedCharacters[word]) return;
+  
+  // If character is already detected, allow changing its color
+  if (detectedCharacters[word]) {
+    let absX = cx, absY = cy;
+    try {
+      const iframes = window.parent.document.querySelectorAll("iframe");
+      iframes.forEach(function(iframe) {
+        if (iframe.contentWindow === (doc.defaultView || window)) {
+          const rect = iframe.getBoundingClientRect();
+          absX += rect.left;
+          absY += rect.top;
+        }
+      });
+    } catch(err) {}
+    
+    // Open color picker for existing character
+    const opener = (window.parent && window.parent.openInlineColorPicker)
+      ? window.parent.openInlineColorPicker
+      : openInlineColorPicker;
+    opener(word, absX, absY);
+    return;
+  }
 
   let absX = cx, absY = cy;
   try {
@@ -1754,7 +1799,9 @@ function initHighlightToolbar() {
     swatch.style.backgroundColor = color;
     swatch.dataset.color = color;
     swatch.addEventListener("click", function() {
-      applyHighlightOrUnderline(color);
+      // Get the type from pendingHighlightType or default to "highlight"
+      const type = pendingHighlightType || "highlight";
+      applyHighlightOrUnderline(color, type);
       document.getElementById("hlToolbar").style.display = "none";
     });
     colorRow.appendChild(swatch);
@@ -1762,14 +1809,14 @@ function initHighlightToolbar() {
 }
 
 // Apply highlight or underline to selected text
-async function applyHighlightOrUnderline(color) {
+async function applyHighlightOrUnderline(color, type) {
   if (!pendingHighlightText || !currentSelectionRange) return;
   
   const highlight = {
     text: pendingHighlightText,
     bookName: currentBookName,
     page: currentPage,
-    type: "highlight",
+    type: type, // "highlight" or "underline"
     color: color,
     date: Date.now()
   };
@@ -1781,10 +1828,10 @@ async function applyHighlightOrUnderline(color) {
   // Add to local array
   highlights.push(highlight);
   
-  // Apply visual highlight to the selection with the ID
-  applyVisualHighlight(currentSelectionRange, "highlight", color, id);
+  // Apply visual highlight/underline to the selection with the ID
+  applyVisualHighlight(currentSelectionRange, type, color, id);
   
-  showToast("Text highlighted!");
+  showToast(type === "highlight" ? "Text highlighted!" : "Text underlined!");
   
   // Clear selection
   if (window.getSelection) {
@@ -1818,9 +1865,17 @@ function applyVisualHighlight(range, type, color, id) {
     
     // Always apply highlight (type is always "highlight" now)
     const span = contents.createElement("span");
-    span.className = "user-highlight";
-    span.style.backgroundColor = color + "66"; // Add transparency
+    span.className = type === "underline" ? "user-underline" : "user-highlight";
+    
+    if (type === "underline") {
+      // For underline, use border-bottom
+      span.style.borderBottom = "2px solid " + color;
+    } else {
+      span.style.backgroundColor = color + "66"; // Add transparency
+    }
+    
     span.dataset.hlDate = Date.now();
+    span.dataset.hlType = type; // Store the type for display
     if (id) {
       span.dataset.hlId = id;
     }
@@ -1943,7 +1998,43 @@ document.getElementById("hlHighlight").addEventListener("click", function(e) {
   pendingHighlightType = "highlight";
   
   // Apply highlight with yellow color
-  applyHighlightOrUnderline("#FFEB3B");
+  applyHighlightOrUnderline("#FFEB3B", "highlight");
+  document.getElementById("hlToolbar").style.display = "none";
+});
+
+// Toolbar button handler - underline selected text
+document.getElementById("hlUnderline").addEventListener("click", function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  console.log("Underline button clicked, pendingHighlightText:", pendingHighlightText);
+  
+  if (!pendingHighlightText) {
+    // Try to get selection from EPUB iframe
+    try {
+      const iframe = document.getElementById("epubViewer").querySelector("iframe");
+      if (iframe && iframe.contentDocument) {
+        const sel = iframe.contentDocument.getSelection();
+        if (sel && sel.toString().trim().length > 0) {
+          pendingHighlightText = sel.toString().trim();
+          currentSelectionRange = sel.getRangeAt(0).cloneRange();
+          console.log("Got fresh selection:", pendingHighlightText);
+        }
+      }
+    } catch(err) {
+      console.log("Error getting selection:", err);
+    }
+  }
+  
+  if (!pendingHighlightText) {
+    console.log("Still no selection found");
+    return;
+  }
+  
+  pendingHighlightType = "underline";
+  
+  // Apply underline with blue color
+  applyHighlightOrUnderline("#2196F3", "underline");
   document.getElementById("hlToolbar").style.display = "none";
 });
 
@@ -2027,8 +2118,16 @@ async function renderAllHighlightsPage() {
       // Create indicator
       const indicator = document.createElement("span");
       indicator.className = "highlight-indicator";
-      indicator.style.backgroundColor = hl.color + "66";
-      indicator.style.border = "2px solid " + hl.color;
+      if (hl.type === "underline") {
+        // For underlines, show a border-bottom indicator
+        indicator.style.borderBottom = "3px solid " + hl.color;
+        indicator.style.flexShrink = "0";
+        indicator.style.width = "20px";
+      } else {
+        // For highlights, show a colored background indicator
+        indicator.style.backgroundColor = hl.color + "66";
+        indicator.style.border = "2px solid " + hl.color;
+      }
       div.appendChild(indicator);
       
       // Text content
@@ -2067,8 +2166,18 @@ async function renderAllHighlightsPage() {
   }
 }
 
+let _lastPage = "home"; // Track where user came from
+
 // Show highlights page
 function showHighlightsPage() {
+  // Store where we came from
+  const reader = document.getElementById("reader");
+  if (reader && reader.style.display === "flex") {
+    _lastPage = "reader";
+  } else {
+    _lastPage = "home";
+  }
+  
   document.getElementById("homeScreen").style.display = "none";
   document.getElementById("reader").style.display = "none";
   document.getElementById("highlightsPage").style.display = "flex";
@@ -2078,11 +2187,12 @@ function showHighlightsPage() {
 // Hide highlights page
 function hideHighlightsPage(fromPage) {
   document.getElementById("highlightsPage").style.display = "none";
-  if (fromPage === "home") {
-    document.getElementById("homeScreen").style.display = "block";
-  } else if (fromPage === "reader") {
+  if (_lastPage === "reader") {
     document.getElementById("reader").style.display = "flex";
+  } else {
+    document.getElementById("homeScreen").style.display = "block";
   }
+  _lastPage = "home";
 }
 
 // Event listeners for highlights page buttons
@@ -2095,11 +2205,5 @@ document.getElementById("readerHighlightsBtn").addEventListener("click", functio
 });
 
 document.getElementById("hlBackBtn").addEventListener("click", function() {
-  // Determine where to go back based on current state
-  const reader = document.getElementById("reader");
-  if (reader && reader.style.display === "flex") {
-    hideHighlightsPage("reader");
-  } else {
-    hideHighlightsPage("home");
-  }
+  hideHighlightsPage();
 });

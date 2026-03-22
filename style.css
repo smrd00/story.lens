@@ -82,6 +82,22 @@ body.dark {
   --progress-track: #332b20;
 }
 
+/* Dark mode - ensure EPUB text is white */
+body.dark #epubViewer,
+body.dark #epubViewer iframe,
+body.dark #epubViewer iframe body,
+body.dark #epubViewer .epub-container,
+body.dark #epubViewer .epub-container body {
+  background-color: #1a1612 !important;
+  color: #e8dfd0 !important;
+}
+
+/* Dark mode - ensure PDF text is white */
+body.dark #pdfCanvas,
+body.dark canvas {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 /* ============================================================
    HIGHLIGHTS PANEL (in settings sidebar)
    ============================================================ */
@@ -1157,6 +1173,16 @@ body.dark .font-select {
     transition: opacity 0.2s;
   }
   .user-highlight:hover {
+    opacity: 0.8;
+  }
+  
+  .user-underline {
+    border-bottom: 2px solid #2196F3;
+    padding: 1px 0;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .user-underline:hover {
     opacity: 0.8;
   }
 
