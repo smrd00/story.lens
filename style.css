@@ -82,6 +82,148 @@ body.dark {
   --progress-track: #332b20;
 }
 
+/* ============================================================
+   HIGHLIGHTS PANEL (in settings sidebar)
+   ============================================================ */
+#highlightsPanel {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+#highlightsPanel h3 {
+  margin: 0 0 8px;
+  font-size: 0.95em;
+  color: var(--text);
+  font-weight: 600;
+}
+
+#highlightsList {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.highlight-item {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: var(--bg-chip);
+  border-radius: 8px;
+  font-size: 0.8em;
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.highlight-indicator {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+.highlight-text {
+  flex: 1 1 100%;
+  color: var(--text);
+  line-height: 1.4;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.highlight-book {
+  display: block;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.highlight-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 50%;
+  line-height: 1;
+  padding: 0;
+}
+
+.highlight-delete:hover {
+  background: var(--bg-chip-hover);
+  color: var(--text);
+}
+
+/* ============================================================
+   ALL HIGHLIGHTS PAGE
+   ============================================================ */
+#highlightsPage {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  z-index: 200;
+  flex-direction: column;
+}
+
+#highlightsPage.open {
+  display: flex;
+}
+
+#highlightsPage:not(.open) {
+  display: none;
+}
+
+.highlights-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--bg-bar);
+  border-bottom: 1px solid var(--border);
+}
+
+.highlights-page-header h1 {
+  margin: 0;
+  font-size: 1.2em;
+  color: var(--text);
+}
+
+.all-highlights-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.all-highlights-list .highlight-item {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+}
+
+.all-highlights-list .highlight-text {
+  font-size: 1em;
+  flex: 1 1 auto;
+}
+
+.all-highlights-list .highlight-book {
+  font-size: 0.9em;
+}
+
+.all-highlights-list .highlight-indicator {
+  width: 24px;
+  height: 24px;
+}
+
 /* Dark mode - more visible highlighted character spans in EPUB */
 body.dark #epubViewer span[data-char-name] {
   opacity: 1 !important;
@@ -352,6 +494,84 @@ body.dark .icon-moon {
     border-radius: 0;
     margin: 0;
     max-width: 100vw;
+  }
+  
+  /* Mobile-specific optimizations */
+  .top-bar {
+    padding: 8px 12px;
+    min-height: 48px;
+  }
+  
+  .top-btn {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .bottom-bar {
+    padding: 8px 12px;
+    min-height: 48px;
+  }
+  
+  /* Tap zones for page turning */
+  .tap-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20%;
+    z-index: 50;
+    cursor: pointer;
+  }
+  .tap-zone-left {
+    left: 0;
+  }
+  .tap-zone-right {
+    right: 0;
+  }
+  .tap-zone-center {
+    left: 20%;
+    right: 20%;
+    width: 60%;
+  }
+  
+  /* Mobile toolbar - bottom sheet style */
+  #hlToolbar {
+    position: fixed;
+    bottom: 20px;
+    left: 10px;
+    right: 10px;
+    max-width: calc(100vw - 20px);
+    margin: 0 auto;
+    border-radius: 16px;
+    padding: 12px 16px;
+    animation: slideUp 0.2s ease;
+  }
+  
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  #hlManagePopup {
+    bottom: 20px;
+    left: 10px;
+    right: 10px;
+    max-width: calc(100vw - 20px);
+    margin: 0 auto;
+    border-radius: 16px;
+    animation: slideUp 0.2s ease;
+  }
+  
+  /* Hide bars in fullscreen reading mode */
+  .top-bar.auto-hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  .bottom-bar.auto-hidden {
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
   }
 }
 
@@ -855,11 +1075,147 @@ body.dark .font-select {
    padding-top: 12px;
    border-top: 1px solid var(--border-light);
  }
- #customColorRow label {
-   font-size: 0.85em;
-   color: var(--text-muted);
- }
- #customColorRow input[type="color"] {
+  #customColorRow label {
+    font-size: 0.85em;
+    color: var(--text-muted);
+  }
+
+  /* ============================================================
+     HIGHLIGHT/UNDERLINE TOOLBAR
+     ============================================================ */
+  #hlToolbar {
+    position: fixed;
+    background: var(--bg-popup);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    box-shadow: var(--shadow-popup);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .hl-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #FFEB3B;
+    color: #000;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    font-family: inherit;
+    font-weight: 600;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .hl-btn:hover {
+    background: #FDD835;
+    transform: translateY(-1px);
+  }
+  .hl-btn:hover {
+    background: var(--bg-chip-hover);
+    transform: translateY(-1px);
+  }
+  .hl-btn:active {
+    transform: translateY(0);
+  }
+
+  .hl-color-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .hl-color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .hl-color-swatch:hover {
+    transform: scale(1.15);
+    border-color: var(--accent);
+  }
+
+  /* User highlight/underline styles in text */
+  .user-highlight {
+    background-color: rgba(255, 235, 59, 0.4);
+    padding: 1px 0;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .user-highlight:hover {
+    opacity: 0.8;
+  }
+
+  /* Highlight management popup */
+  .hl-manage-popup {
+    position: fixed;
+    background: var(--bg-popup);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: var(--shadow-popup);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 150px;
+  }
+
+  .hl-manage-colors {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .hl-manage-colors .color-option {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s;
+  }
+
+  .hl-manage-colors .color-option:hover {
+    transform: scale(1.15);
+    border-color: var(--accent);
+  }
+
+  .hl-delete-btn {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: #ffebee;
+    color: #c62828;
+    font-size: 0.85em;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .hl-delete-btn:hover {
+    background: #ffcdd2;
+  }
+
+  .user-underline {
+    border-bottom: 3px solid;
+    padding-bottom: 1px;
+  }
+
+  #customColorRow input[type="color"] {
    width: 36px;
    height: 36px;
    border: none;

@@ -31,6 +31,14 @@
     <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
   </button>
   
+  <!-- All Highlights button in top left -->
+  <button id="allHighlightsBtn" class="home-dark-toggle" title="View all highlights" style="left: 20px; right: auto;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 20h9"></path>
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+    </svg>
+  </button>
+  
   <div id="homeHero">
     <div id="homeLogo">
       
@@ -53,6 +61,17 @@
   </div>
 </div>
 
+  <!-- ========== ALL HIGHLIGHTS PAGE ========== -->
+  <div id="highlightsPage" style="display:none;">
+    <div class="highlights-page-header">
+      <button id="hlBackBtn" class="top-btn back-btn" title="Back">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <h1>All Highlights</h1>
+    </div>
+    <div id="allHighlightsList" class="all-highlights-list"></div>
+  </div>
+
   <!-- ========== READER ========== -->
   <div id="reader" style="display:none;">
 
@@ -66,6 +85,13 @@
       <button id="savePageBtn" class="top-btn bookmark-btn" title="Save position / Add bookmark">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </button>
+      <!-- Highlights button -->
+      <button id="readerHighlightsBtn" class="top-btn" title="View all highlights">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
         </svg>
       </button>
       <button id="settingsBtn" class="top-btn" title="Settings">
@@ -115,6 +141,11 @@
         <h3>Characters</h3>
         <p class="sidebar-hint">Tap a name to set its colour. Long-press or select any word in the text to add it.</p>
         <div id="characterList"></div>
+      </div>
+      <div id="highlightsPanel">
+        <h3>Highlights & Notes</h3>
+        <p class="sidebar-hint">Select text while reading to highlight or underline. Your notes will appear here.</p>
+        <div id="highlightsList"></div>
       </div>
     </div>
 
@@ -199,6 +230,23 @@
     <button id="inlineApply" class="btn-primary">Apply</button>
     <button id="inlineClose" class="btn-ghost">Cancel</button>
   </div>
+</div>
+
+<!-- Highlight floating toolbar (shown when text is selected) -->
+<div id="hlToolbar" class="hl-toolbar" style="display:none;">
+  <button id="hlHighlight" class="hl-btn" title="Highlight">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 20h9"></path>
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+    </svg>
+    Highlight
+  </button>
+</div>
+
+<!-- Highlight management popup (shown when clicking on highlighted text) -->
+<div id="hlManagePopup" class="hl-manage-popup" style="display:none;">
+  <div class="hl-manage-colors"></div>
+  <button id="hlDeleteBtn" class="hl-delete-btn">Delete Highlight</button>
 </div>
 
 <!-- "Add as character?" prompt (shown when user selects unknown text) -->

@@ -46,6 +46,10 @@ let currentFont = 'default'; // 'default' | 'literata' | 'merriweather' | 'lora'
 let characterStyles    = {}; // per-character style: "underline" | "solid" | "ombre"
 let characterIcons     = {}; // per-character icon: "none" | "star" | "dot" | "triangle" | "diamond"
 
+// Highlights and underlines storage (per book)
+let highlights = []; // Array of { id, text, bookName, page, type: 'highlight'|'underline', color, date }
+let underlines = [];
+
 const DYSLEXIC_FONT_CSS = `
   @font-face {
     font-family: 'OpenDyslexic';
@@ -58,17 +62,24 @@ const DYSLEXIC_FONT_CSS = `
 //  INDEXED DB  — Library Storage
 // ============================================================
 const DB_NAME    = "StoryLensLibrary";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented to trigger upgrade for highlights store
 const STORE_NAME = "books";
+const HL_STORE_NAME = "highlights"; // Store for highlights and underlines
 
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = function(e) {
       const db = e.target.result;
+      // Create books store if it doesn't exist (for existing users)
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
         store.createIndex("name", "name", { unique: false });
+      }
+      // Create highlights store if it doesn't exist
+      if (!db.objectStoreNames.contains(HL_STORE_NAME)) {
+        const hlStore = db.createObjectStore(HL_STORE_NAME, { keyPath: "id", autoIncrement: true });
+        hlStore.createIndex("bookName", "bookName", { unique: false });
       }
     };
     req.onsuccess  = e => resolve(e.target.result);
@@ -128,6 +139,54 @@ async function deleteBookFromDB(id) {
   return new Promise((resolve, reject) => {
     const tx    = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
+    const req   = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// ============================================================
+//  HIGHLIGHTS & UNDERLINES - IndexedDB Storage
+// ============================================================
+async function saveHighlightToDB(highlight) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(HL_STORE_NAME, "readwrite");
+    const store = tx.objectStore(HL_STORE_NAME);
+    const req   = store.add(highlight);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function getAllHighlights() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(HL_STORE_NAME, "readonly");
+    const store = tx.objectStore(HL_STORE_NAME);
+    const req   = store.getAll();
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function getHighlightsByBook(bookName) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(HL_STORE_NAME, "readonly");
+    const store = tx.objectStore(HL_STORE_NAME);
+    const idx   = store.index("bookName");
+    const req   = idx.getAll(bookName);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function deleteHighlightFromDB(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(HL_STORE_NAME, "readwrite");
+    const store = tx.objectStore(HL_STORE_NAME);
     const req   = store.delete(id);
     req.onsuccess = () => resolve();
     req.onerror   = e => reject(e.target.error);
@@ -224,6 +283,20 @@ function showReader(bookName) {
   characterStyles    = {};
   characterIcons     = {};
   updateCharacterList();
+  
+  // Load highlights for this book
+  loadHighlightsForBook(bookName);
+}
+
+// Load highlights for a specific book
+async function loadHighlightsForBook(bookName) {
+  try {
+    const bookHighlights = await getHighlightsByBook(bookName);
+    highlights = bookHighlights;
+  } catch(err) {
+    console.warn("Could not load highlights:", err);
+    highlights = [];
+  }
 }
 
 // ============================================================
@@ -375,6 +448,155 @@ function loadEPUB(arrayBuffer, filename) {
     }
     injectCapitalWordClicker(contents);
     applyFontToContents(contents);
+    
+    // Add selection handler for highlight/underline in EPUB
+    const doc = contents.document;
+    if (doc._hlSelectionHandler) {
+      doc.removeEventListener("mouseup", doc._hlSelectionHandler);
+      doc.removeEventListener("touchend", doc._hlSelectionHandler);
+    }
+    doc._hlSelectionHandler = function(e) {
+      // Prevent default to keep selection
+      if (e) e.preventDefault();
+      setTimeout(function() {
+        const sel = doc.getSelection();
+        if (!sel || sel.isCollapsed) {
+          const toolbar = document.getElementById("hlToolbar");
+          if (toolbar) toolbar.style.display = "none";
+          return;
+        }
+        const selectedText = sel.toString().trim();
+        if (selectedText.length < 2) return;
+        
+        try {
+          const range = sel.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          
+          // Get iframe position
+          const iframe = document.getElementById("epubViewer").querySelector("iframe");
+          let iframeX = 0, iframeY = 0;
+          if (iframe) {
+            const ifRect = iframe.getBoundingClientRect();
+            iframeX = ifRect.left;
+            iframeY = ifRect.top;
+          }
+          
+          const absX = rect.left + rect.width / 2 + iframeX;
+          const absY = rect.bottom + iframeY;
+          
+          pendingHighlightText = selectedText;
+          currentSelectionRange = range.cloneRange();
+          
+          const toolbar = document.getElementById("hlToolbar");
+          if (toolbar) {
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const toolbarWidth = 200;
+            let x = Math.min(absX - toolbarWidth / 2, vw - toolbarWidth - 10);
+            let y = Math.min(absY + 10, vh - 100);
+            x = Math.max(10, x);
+            y = Math.max(10, y);
+            toolbar.style.left = x + "px";
+            toolbar.style.top = y + "px";
+            toolbar.style.display = "block";
+            initHighlightToolbar();
+          }
+        } catch(err) {
+          console.warn("Could not show highlight toolbar:", err);
+        }
+      }, 50);
+    };
+    doc.addEventListener("mouseup", doc._hlSelectionHandler);
+    doc.addEventListener("touchend", doc._hlSelectionHandler);
+    
+    // Add click handler for highlighted text
+    if (doc._hlClickHandler) {
+      doc.removeEventListener("click", doc._hlClickHandler);
+    }
+    doc._hlClickHandler = function(e) {
+      // Check if clicking on a highlighted span
+      if (e.target && e.target.classList && e.target.classList.contains("user-highlight")) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const highlightSpan = e.target;
+        const rect = highlightSpan.getBoundingClientRect();
+        
+        // Get iframe position
+        const iframe = document.getElementById("epubViewer").querySelector("iframe");
+        let iframeX = 0, iframeY = 0;
+        if (iframe) {
+          const ifRect = iframe.getBoundingClientRect();
+          iframeX = ifRect.left;
+          iframeY = ifRect.top;
+        }
+        
+        // Store reference to the span for later
+        window._currentHighlightSpan = highlightSpan;
+        
+        // Show popup
+        const popup = document.getElementById("hlManagePopup");
+        const colorRow = popup.querySelector(".hl-manage-colors");
+        
+        // Clear and add color options
+        colorRow.innerHTML = "";
+        const colors = ["#FFEB3B", "#4CAF50", "#2196F3", "#FF9800", "#E91E63", "#9C27B0"];
+        colors.forEach(color => {
+          const swatch = document.createElement("div");
+          swatch.className = "color-option";
+          swatch.style.backgroundColor = color;
+          swatch.addEventListener("click", function(evt) {
+            evt.stopPropagation();
+            // Change highlight color
+            highlightSpan.style.backgroundColor = color + "66";
+            popup.style.display = "none";
+          });
+          colorRow.appendChild(swatch);
+        });
+        
+        // Position popup
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let x = rect.left + iframeX;
+        let y = rect.bottom + iframeY + 10;
+        
+        // Keep within viewport
+        if (x + 150 > vw) x = vw - 160;
+        if (y + 100 > vh) y = rect.top + iframeY - 110;
+        
+        popup.style.left = x + "px";
+        popup.style.top = y + "px";
+        popup.style.display = "block";
+        
+        // Setup delete button
+        const deleteBtn = document.getElementById("hlDeleteBtn");
+        deleteBtn.onclick = function(evt) {
+          evt.stopPropagation();
+          // Remove the highlight
+          const text = highlightSpan.textContent;
+          const parent = highlightSpan.parentNode;
+          while (highlightSpan.firstChild) {
+            parent.insertBefore(highlightSpan.firstChild, highlightSpan);
+          }
+          parent.removeChild(highlightSpan);
+          popup.style.display = "none";
+          
+          // Also remove from database if it has an ID
+          const hlId = highlightSpan.dataset.hlId;
+          if (hlId) {
+            deleteHighlightFromDB(parseInt(hlId));
+          }
+        };
+        
+        return;
+      }
+      
+      // Close popup when clicking elsewhere
+      const popup = document.getElementById("hlManagePopup");
+      if (popup && popup.style.display === "block") {
+        popup.style.display = "none";
+      }
+    };
+    doc.addEventListener("click", doc._hlClickHandler);
+    
     // Apply dark mode if active
     if (document.body.classList.contains("dark")) {
       let ds = contents.document.getElementById("sl-dark-style");
@@ -491,8 +713,10 @@ window.addEventListener("resize", function() {
   let touchStartY = 0;
   let tapTimeout = null;
   let hasSwiped = false;
+  let isOnContent = false;
   
   const readingArea = document.getElementById("readingArea");
+  const readingContent = document.getElementById("readingContent");
   const topBar = document.getElementById("topBar");
   const bottomBar = document.getElementById("bottomBar");
   const isMobile = window.innerWidth <= 680;
@@ -502,6 +726,11 @@ window.addEventListener("resize", function() {
     touchStartY = e.changedTouches[0].clientY;
     hasSwiped = false;
     clearTimeout(tapTimeout);
+    
+    // Check if touch started on the content area
+    const touch = e.changedTouches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    isOnContent = element && (readingContent.contains(element) || element === readingContent);
   }, { passive: true });
 
   readingArea.addEventListener("touchmove", function(e) {
@@ -517,7 +746,7 @@ window.addEventListener("resize", function() {
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
     
-    // Horizontal swipe for page navigation
+    // Horizontal swipe for page navigation (works everywhere)
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       if (dx < 0) {
         nextPage(); // swipe left → next
@@ -527,8 +756,8 @@ window.addEventListener("resize", function() {
       return;
     }
     
-    // Mobile: tap to toggle fullscreen bars
-    if (isMobile && !hasSwiped && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+    // Mobile: tap to toggle fullscreen bars - only if NOT on content area
+    if (isMobile && !hasSwiped && !isOnContent && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
       tapTimeout = setTimeout(function() {
         const topBarHidden = topBar.classList.contains("hidden");
         const bottomBarHidden = bottomBar.classList.contains("hidden");
@@ -568,6 +797,8 @@ document.addEventListener("keydown", function(e) {
 // ============================================================
 document.getElementById("settingsBtn").addEventListener("click", function() {
   document.getElementById("settingsPopup").classList.add("open");
+  // Load highlights list
+  renderHighlightsList();
 });
 document.getElementById("settingsClose").addEventListener("click", function() {
   document.getElementById("settingsPopup").classList.remove("open");
@@ -728,6 +959,78 @@ function updateCharacterList() {
 
       list.appendChild(div);
     });
+}
+
+// ============================================================
+//  RENDER HIGHLIGHTS LIST IN SETTINGS
+// ============================================================
+async function renderHighlightsList() {
+  const list = document.getElementById("highlightsList");
+  if (!list) return;
+  
+  list.innerHTML = "";
+  
+  try {
+    const allHighlights = await getAllHighlights();
+    
+    if (allHighlights.length === 0) {
+      list.innerHTML = "<p class='sidebar-hint'>No highlights or underlines yet. Select text while reading to add some!</p>";
+      return;
+    }
+    
+    // Sort by date (newest first)
+    allHighlights.sort((a, b) => b.date - a.date);
+    
+    allHighlights.forEach(hl => {
+      const div = document.createElement("div");
+      div.className = "highlight-item";
+      
+      // Create indicator
+      const indicator = document.createElement("span");
+      indicator.className = "highlight-indicator";
+      if (hl.type === "highlight") {
+        indicator.style.backgroundColor = hl.color + "66";
+        indicator.style.border = "2px solid " + hl.color;
+      } else {
+        indicator.style.borderBottom = "3px solid " + hl.color;
+        indicator.style.flexShrink = "0";
+      }
+      div.appendChild(indicator);
+      
+      // Text content
+      const textSpan = document.createElement("span");
+      textSpan.className = "highlight-text";
+      textSpan.textContent = hl.text.length > 80 ? hl.text.substring(0, 80) + "..." : hl.text;
+      textSpan.title = hl.text;
+      div.appendChild(textSpan);
+      
+      // Book name
+      const bookSpan = document.createElement("span");
+      bookSpan.className = "highlight-book";
+      bookSpan.textContent = hl.bookName.replace(/\.(pdf|epub)$/i, "");
+      div.appendChild(bookSpan);
+      
+      // Delete button
+      const delBtn = document.createElement("button");
+      delBtn.className = "highlight-delete";
+      delBtn.innerHTML = "×";
+      delBtn.title = "Delete";
+      delBtn.addEventListener("click", async function(e) {
+        e.stopPropagation();
+        if (confirm("Delete this " + hl.type + "?")) {
+          await deleteHighlightFromDB(hl.id);
+          highlights = highlights.filter(h => h.id !== hl.id);
+          renderHighlightsList();
+        }
+      });
+      div.appendChild(delBtn);
+      
+      list.appendChild(div);
+    });
+  } catch(err) {
+    console.warn("Could not load highlights:", err);
+    list.innerHTML = "<p class='sidebar-hint'>Could not load highlights.</p>";
+  }
 }
 
 // ============================================================
@@ -1032,30 +1335,48 @@ function injectCapitalWordClicker(contents) {
 function handleWordInteraction(e, contents, mode) {
   const doc = contents.document;
 
-  // First, check if there is a user text selection (for foreign names)
+  // First, check if there is a user text selection (for highlighting/underlining)
   const sel = doc.getSelection ? doc.getSelection() : null;
   if (sel && sel.toString().trim().length > 0) {
     const selectedText = sel.toString().trim();
-    // Accept any sequence of letters (supports accented/foreign characters)
-    if (/^[\p{L}][\p{L}\s\-']{1,}/u.test(selectedText) || /^\S{2,}$/.test(selectedText)) {
+    // Show highlight toolbar for any text selection (more than one word)
+    if (selectedText.length >= 2 && selectedText.indexOf(' ') >= 0) {
       let absX = 0, absY = 0;
       try {
         const range = sel.getRangeAt(0);
         const rect  = range.getBoundingClientRect();
         absX = rect.left + rect.width / 2;
         absY = rect.bottom;
-        const iframes = window.parent.document.querySelectorAll("iframe");
-        iframes.forEach(function(iframe) {
-          if (iframe.contentWindow === (doc.defaultView || window)) {
-            const ifrect = iframe.getBoundingClientRect();
-            absX += ifrect.left;
-            absY += ifrect.top;
-          }
-        });
+        
+        // Get iframe position
+        const iframe = document.getElementById("epubViewer").querySelector("iframe");
+        if (iframe) {
+          const ifrect = iframe.getBoundingClientRect();
+          absX += ifrect.left;
+          absY += ifrect.top;
+        }
       } catch(err) {}
 
-      sel.removeAllRanges();
-      showAddCharPrompt(selectedText, absX, absY, contents);
+      pendingHighlightText = selectedText;
+      currentSelectionRange = sel.getRangeAt(0).cloneRange();
+      // Store the document reference for later use
+      window._hlSelectionDoc = doc;
+      
+      console.log("Selection stored, text:", pendingHighlightText, "doc:", doc);
+      
+      const toolbar = document.getElementById("hlToolbar");
+      if (toolbar) {
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const toolbarWidth = 200;
+        let x = Math.min(absX - toolbarWidth / 2, vw - toolbarWidth - 10);
+        let y = Math.min(absY + 10, vh - 100);
+        x = Math.max(10, x);
+        y = Math.max(10, y);
+        toolbar.style.left = x + "px";
+        toolbar.style.top = y + "px";
+        toolbar.style.display = "block";
+      }
+      // Return early to skip character detection for multi-word selections
       return;
     }
   }
@@ -1387,6 +1708,243 @@ document.addEventListener("click", function(e) {
     prompt.style.display = "none";
     addCharContents = null;
   }
+  // Close highlight toolbar when clicking outside
+  const hlToolbar = document.getElementById("hlToolbar");
+  if (hlToolbar && hlToolbar.style.display === "block" && !hlToolbar.contains(e.target)) {
+    // Don't close if clicking on the reader content (we'll handle this via selectionchange)
+    const reader = document.getElementById("reader");
+    if (reader && !reader.contains(e.target)) {
+      hlToolbar.style.display = "none";
+    }
+  }
+});
+
+// ============================================================
+//  HIGHLIGHT & UNDERLINE TOOLBAR
+// ============================================================
+let currentSelectionRange = null;
+
+// Colors for highlights and underlines
+const HL_COLORS = [
+  "#FFEB3B", // Yellow
+  "#4CAF50", // Green
+  "#2196F3", // Blue
+  "#FF9800", // Orange
+  "#E91E63", // Pink
+  "#9C27B0", // Purple
+];
+
+let pendingHighlightText = "";
+let pendingHighlightType = ""; // "highlight" or "underline"
+
+// Initialize highlight color palette in toolbar
+function initHighlightToolbar() {
+  // Create color options for highlight/underline
+  let colorRow = document.getElementById("hlColorRow");
+  if (!colorRow) {
+    colorRow = document.createElement("div");
+    colorRow.id = "hlColorRow";
+    colorRow.className = "hl-color-row";
+    document.getElementById("hlToolbar").appendChild(colorRow);
+  }
+  colorRow.innerHTML = "";
+  HL_COLORS.forEach(color => {
+    const swatch = document.createElement("div");
+    swatch.className = "hl-color-swatch";
+    swatch.style.backgroundColor = color;
+    swatch.dataset.color = color;
+    swatch.addEventListener("click", function() {
+      applyHighlightOrUnderline(color);
+      document.getElementById("hlToolbar").style.display = "none";
+    });
+    colorRow.appendChild(swatch);
+  });
+}
+
+// Apply highlight or underline to selected text
+async function applyHighlightOrUnderline(color) {
+  if (!pendingHighlightText || !currentSelectionRange) return;
+  
+  const highlight = {
+    text: pendingHighlightText,
+    bookName: currentBookName,
+    page: currentPage,
+    type: "highlight",
+    color: color,
+    date: Date.now()
+  };
+  
+  // Save to IndexedDB and get the ID
+  const id = await saveHighlightToDB(highlight);
+  highlight.id = id;
+  
+  // Add to local array
+  highlights.push(highlight);
+  
+  // Apply visual highlight to the selection with the ID
+  applyVisualHighlight(currentSelectionRange, "highlight", color, id);
+  
+  showToast("Text highlighted!");
+  
+  // Clear selection
+  if (window.getSelection) {
+    window.getSelection().removeAllRanges();
+  }
+  currentSelectionRange = null;
+  pendingHighlightText = "";
+  pendingHighlightType = "";
+}
+
+// Apply visual highlight to the DOM
+function applyVisualHighlight(range, type, color, id) {
+  try {
+    if (!range) {
+      console.log("No range provided");
+      return;
+    }
+    
+    // Use the stored document reference if available
+    let contents = window._hlSelectionDoc;
+    if (!contents) {
+      contents = range.startContainer ? range.startContainer.ownerDocument : null;
+    }
+    
+    if (!contents) {
+      console.log("Could not get document");
+      return;
+    }
+    
+    console.log("Applying highlight, type:", type, "color:", color, "doc:", contents);
+    
+    // Always apply highlight (type is always "highlight" now)
+    const span = contents.createElement("span");
+    span.className = "user-highlight";
+    span.style.backgroundColor = color + "66"; // Add transparency
+    span.dataset.hlDate = Date.now();
+    if (id) {
+      span.dataset.hlId = id;
+    }
+    
+    try {
+      range.surroundContents(span);
+      console.log("Highlight applied successfully via surroundContents");
+    } catch(e) {
+      console.log("surroundContents failed, trying extract/insert:", e);
+      // If surroundContents fails (complex selection), try a different approach
+      try {
+        const fragment = range.extractContents();
+        span.appendChild(fragment);
+        range.insertNode(span);
+        console.log("Highlight applied via extract/insert");
+      } catch(e2) {
+        console.log("Both methods failed:", e2);
+      }
+    }
+    
+    // Clear the stored doc reference
+    window._hlSelectionDoc = null;
+  } catch(err) {
+    console.log("Error applying highlight:", err);
+    console.warn("Could not apply visual highlight:", err);
+  }
+}
+
+// Show the highlight/underline toolbar at the selection position
+function showHighlightToolbar(range) {
+  const toolbar = document.getElementById("hlToolbar");
+  if (!toolbar || !range) return;
+  
+  currentSelectionRange = range;
+  
+  try {
+    const rect = range.getBoundingClientRect();
+    const toolbarWidth = 200;
+    
+    let x = rect.left + (rect.width / 2) - (toolbarWidth / 2) + window.scrollX;
+    let y = rect.top - 50 + window.scrollY;
+    
+    // Keep within viewport
+    x = Math.max(10, Math.min(x, window.innerWidth - toolbarWidth - 10));
+    y = Math.max(10, y);
+    
+    toolbar.style.left = x + "px";
+    toolbar.style.top = y + "px";
+    toolbar.style.display = "block";
+    
+    // Initialize colors
+    initHighlightToolbar();
+  } catch(err) {
+    console.warn("Could not show highlight toolbar:", err);
+  }
+}
+
+// Handle text selection for highlighting
+function handleTextSelectionForHighlight() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) {
+    document.getElementById("hlToolbar").style.display = "none";
+    return;
+  }
+  
+  const text = sel.toString().trim();
+  if (text.length < 2) {
+    document.getElementById("hlToolbar").style.display = "none";
+    return;
+  }
+  
+  // Only show for selections in the reader (not UI elements)
+  const reader = document.getElementById("reader");
+  if (!reader) return;
+  
+  // Check if selection is within the reader
+  const range = sel.getRangeAt(0);
+  if (range && reader.contains(range.commonAncestorContainer)) {
+    pendingHighlightText = text;
+    currentSelectionRange = range;
+    showHighlightToolbar(range);
+  }
+}
+
+// Listen for selection changes
+document.addEventListener("selectionchange", function() {
+  // Small delay to let selection complete
+  setTimeout(handleTextSelectionForHighlight, 100);
+});
+
+// Toolbar button handler - highlight selected text
+document.getElementById("hlHighlight").addEventListener("click", function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  console.log("Highlight button clicked, pendingHighlightText:", pendingHighlightText);
+  
+  if (!pendingHighlightText) {
+    // Try to get selection from EPUB iframe
+    try {
+      const iframe = document.getElementById("epubViewer").querySelector("iframe");
+      if (iframe && iframe.contentDocument) {
+        const sel = iframe.contentDocument.getSelection();
+        if (sel && sel.toString().trim().length > 0) {
+          pendingHighlightText = sel.toString().trim();
+          currentSelectionRange = sel.getRangeAt(0).cloneRange();
+          console.log("Got fresh selection:", pendingHighlightText);
+        }
+      }
+    } catch(err) {
+      console.log("Error getting selection:", err);
+    }
+  }
+  
+  if (!pendingHighlightText) {
+    console.log("Still no selection found");
+    return;
+  }
+  
+  pendingHighlightType = "highlight";
+  
+  // Apply highlight with yellow color
+  applyHighlightOrUnderline("#FFEB3B");
+  document.getElementById("hlToolbar").style.display = "none";
 });
 
 // ============================================================
@@ -1440,3 +1998,108 @@ document.addEventListener("click", function(e) {
 //  INIT
 // ============================================================
 renderLibrary();
+
+// ============================================================
+//  ALL HIGHLIGHTS PAGE
+// ============================================================
+// Function to render all highlights on the highlights page
+async function renderAllHighlightsPage() {
+  const list = document.getElementById("allHighlightsList");
+  if (!list) return;
+  
+  list.innerHTML = "";
+  
+  try {
+    const allHighlights = await getAllHighlights();
+    
+    if (allHighlights.length === 0) {
+      list.innerHTML = "<p style='text-align:center;color:var(--text-muted);padding:40px;'>No highlights yet. Select text while reading to add highlights!</p>";
+      return;
+    }
+    
+    // Sort by date (newest first)
+    allHighlights.sort((a, b) => b.date - a.date);
+    
+    allHighlights.forEach(hl => {
+      const div = document.createElement("div");
+      div.className = "highlight-item";
+      
+      // Create indicator
+      const indicator = document.createElement("span");
+      indicator.className = "highlight-indicator";
+      indicator.style.backgroundColor = hl.color + "66";
+      indicator.style.border = "2px solid " + hl.color;
+      div.appendChild(indicator);
+      
+      // Text content
+      const textSpan = document.createElement("span");
+      textSpan.className = "highlight-text";
+      textSpan.textContent = hl.text;
+      textSpan.title = hl.text;
+      div.appendChild(textSpan);
+      
+      // Book name
+      const bookSpan = document.createElement("span");
+      bookSpan.className = "highlight-book";
+      bookSpan.textContent = hl.bookName ? hl.bookName.replace(/\.(pdf|epub)$/i, "") : "Unknown book";
+      div.appendChild(bookSpan);
+      
+      // Delete button
+      const delBtn = document.createElement("button");
+      delBtn.className = "highlight-delete";
+      delBtn.innerHTML = "×";
+      delBtn.title = "Delete";
+      delBtn.addEventListener("click", async function(e) {
+        e.stopPropagation();
+        if (confirm("Delete this highlight?")) {
+          await deleteHighlightFromDB(hl.id);
+          highlights = highlights.filter(h => h.id !== hl.id);
+          renderAllHighlightsPage();
+        }
+      });
+      div.appendChild(delBtn);
+      
+      list.appendChild(div);
+    });
+  } catch(err) {
+    console.warn("Could not load highlights:", err);
+    list.innerHTML = "<p style='text-align:center;color:var(--text-muted);padding:40px;'>Could not load highlights.</p>";
+  }
+}
+
+// Show highlights page
+function showHighlightsPage() {
+  document.getElementById("homeScreen").style.display = "none";
+  document.getElementById("reader").style.display = "none";
+  document.getElementById("highlightsPage").style.display = "flex";
+  renderAllHighlightsPage();
+}
+
+// Hide highlights page
+function hideHighlightsPage(fromPage) {
+  document.getElementById("highlightsPage").style.display = "none";
+  if (fromPage === "home") {
+    document.getElementById("homeScreen").style.display = "block";
+  } else if (fromPage === "reader") {
+    document.getElementById("reader").style.display = "flex";
+  }
+}
+
+// Event listeners for highlights page buttons
+document.getElementById("allHighlightsBtn").addEventListener("click", function() {
+  showHighlightsPage();
+});
+
+document.getElementById("readerHighlightsBtn").addEventListener("click", function() {
+  showHighlightsPage();
+});
+
+document.getElementById("hlBackBtn").addEventListener("click", function() {
+  // Determine where to go back based on current state
+  const reader = document.getElementById("reader");
+  if (reader && reader.style.display === "flex") {
+    hideHighlightsPage("reader");
+  } else {
+    hideHighlightsPage("home");
+  }
+});
