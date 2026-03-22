@@ -2091,6 +2091,21 @@ document.getElementById("hlUnderline").addEventListener("click", function(e) {
 renderLibrary();
 
 // ============================================================
+//  PWA - Service Worker Registration
+// ============================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(registration => {
+        console.log('SW registered:', registration.scope);
+      })
+      .catch(error => {
+        console.log('SW registration failed:', error);
+      });
+  });
+}
+
+// ============================================================
 //  ALL HIGHLIGHTS PAGE
 // ============================================================
 // Function to render all highlights on the highlights page
