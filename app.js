@@ -193,6 +193,27 @@ async function deleteHighlightFromDB(id) {
   });
 }
 
+async function updateHighlightColorInDB(id, color) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(HL_STORE_NAME, "readwrite");
+    const store = tx.objectStore(HL_STORE_NAME);
+    const getReq = store.get(id);
+    getReq.onsuccess = function() {
+      const data = getReq.result;
+      if (data) {
+        data.color = color;
+        const putReq = store.put(data);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = e => reject(e.target.error);
+      } else {
+        resolve(); // Not found, just resolve
+      }
+    };
+    getReq.onerror = e => reject(e.target.error);
+  });
+}
+
 // ============================================================
 //  LIBRARY UI
 // ============================================================
@@ -454,6 +475,7 @@ function loadEPUB(arrayBuffer, filename) {
     if (doc._hlSelectionHandler) {
       doc.removeEventListener("mouseup", doc._hlSelectionHandler);
       doc.removeEventListener("touchend", doc._hlSelectionHandler);
+      doc.removeEventListener("selectionchange", doc._hlSelectionChangeHandler);
     }
     doc._hlSelectionHandler = function(e) {
       // Prevent default to keep selection
@@ -508,18 +530,31 @@ function loadEPUB(arrayBuffer, filename) {
     doc.addEventListener("mouseup", doc._hlSelectionHandler);
     doc.addEventListener("touchend", doc._hlSelectionHandler);
     
+    // Also listen for selectionchange on the iframe document (for mobile)
+    if (doc._hlSelectionChangeHandler) {
+      doc.removeEventListener("selectionchange", doc._hlSelectionChangeHandler);
+    }
+    doc._hlSelectionChangeHandler = function() {
+      setTimeout(doc._hlSelectionHandler, 100);
+    };
+    doc.addEventListener("selectionchange", doc._hlSelectionChangeHandler);
+    
     // Add click handler for highlighted text
     if (doc._hlClickHandler) {
       doc.removeEventListener("click", doc._hlClickHandler);
     }
     doc._hlClickHandler = function(e) {
-      // Check if clicking on a highlighted span
-      if (e.target && e.target.classList && e.target.classList.contains("user-highlight")) {
+      // Check if clicking on a highlighted span or underlined span
+      const isHighlight = e.target && e.target.classList && e.target.classList.contains("user-highlight");
+      const isUnderline = e.target && e.target.classList && e.target.classList.contains("user-underline");
+      
+      if (isHighlight || isUnderline) {
         e.preventDefault();
         e.stopPropagation();
         
         const highlightSpan = e.target;
         const rect = highlightSpan.getBoundingClientRect();
+        const isUnderlineSpan = isUnderline;
         
         // Get iframe position
         const iframe = document.getElementById("epubViewer").querySelector("iframe");
@@ -532,6 +567,7 @@ function loadEPUB(arrayBuffer, filename) {
         
         // Store reference to the span for later
         window._currentHighlightSpan = highlightSpan;
+        window._currentHighlightSpanIsUnderline = isUnderlineSpan;
         
         // Show popup
         const popup = document.getElementById("hlManagePopup");
@@ -546,8 +582,29 @@ function loadEPUB(arrayBuffer, filename) {
           swatch.style.backgroundColor = color;
           swatch.addEventListener("click", function(evt) {
             evt.stopPropagation();
-            // Change highlight color
-            highlightSpan.style.backgroundColor = color + "66";
+            // Change color based on type
+            if (isUnderlineSpan) {
+              // Change underline color (border-bottom)
+              highlightSpan.style.borderBottomColor = color;
+              // Update the injected style for this color
+              const iframe = document.getElementById("epubViewer").querySelector("iframe");
+              if (iframe && iframe.contentDocument) {
+                injectUnderlineStyles(iframe.contentDocument, color);
+              }
+              // Also update the data in DB
+              const hlId = highlightSpan.dataset.hlId;
+              if (hlId) {
+                updateHighlightColorInDB(parseInt(hlId), color);
+              }
+            } else {
+              // Change highlight color (background)
+              highlightSpan.style.backgroundColor = color + "66";
+              // Also update the data in DB
+              const hlId = highlightSpan.dataset.hlId;
+              if (hlId) {
+                updateHighlightColorInDB(parseInt(hlId), color);
+              }
+            }
             popup.style.display = "none";
           });
           colorRow.appendChild(swatch);
@@ -568,9 +625,10 @@ function loadEPUB(arrayBuffer, filename) {
         
         // Setup delete button
         const deleteBtn = document.getElementById("hlDeleteBtn");
+        deleteBtn.textContent = isUnderlineSpan ? "Delete Underline" : "Delete Highlight";
         deleteBtn.onclick = function(evt) {
           evt.stopPropagation();
-          // Remove the highlight
+          // Remove the highlight/underline
           const text = highlightSpan.textContent;
           const parent = highlightSpan.parentNode;
           while (highlightSpan.firstChild) {
@@ -1129,9 +1187,9 @@ function applySpanStyle(span, color, style, icon) {
       span.style.color            = "#000000";
     } else {
       // Rounded underline style - thicker and more visible
-      span.style.borderBottom  = "4px dashed " + color;
-      span.style.paddingBottom = "3px";
-      span.style.borderRadius  = "4px";
+      span.style.borderBottom  = "3px dashed " + color;
+      span.style.paddingBottom = "2px";
+      span.style.borderRadius  = "2px";
     }
   }
 
@@ -1842,6 +1900,26 @@ async function applyHighlightOrUnderline(color, type) {
   pendingHighlightType = "";
 }
 
+// Inject underline styles into iframe document to ensure visibility
+function injectUnderlineStyles(doc, color) {
+  if (!doc) return;
+  
+  // Check if style already injected
+  if (doc.getElementById('user-underline-styles')) return;
+  
+  const style = doc.createElement('style');
+  style.id = 'user-underline-styles';
+  style.textContent = `
+    .user-underline {
+      border-bottom: 3px solid ${color} !important;
+      padding-bottom: 2px !important;
+      display: inline !important;
+      position: relative !important;
+    }
+  `;
+  doc.head.appendChild(style);
+}
+
 // Apply visual highlight to the DOM
 function applyVisualHighlight(range, type, color, id) {
   try {
@@ -1868,8 +1946,11 @@ function applyVisualHighlight(range, type, color, id) {
     span.className = type === "underline" ? "user-underline" : "user-highlight";
     
     if (type === "underline") {
-      // For underline, use border-bottom
-      span.style.borderBottom = "2px solid " + color;
+      // For underline, use border-bottom with stronger styling
+      span.style.borderBottom = "3px solid " + color;
+      span.style.paddingBottom = "2px";
+      // Inject underline styles into the iframe document to ensure they're applied
+      injectUnderlineStyles(contents, color);
     } else {
       span.style.backgroundColor = color + "66"; // Add transparency
     }
@@ -1935,7 +2016,21 @@ function showHighlightToolbar(range) {
 
 // Handle text selection for highlighting
 function handleTextSelectionForHighlight() {
-  const sel = window.getSelection();
+  let sel = window.getSelection();
+  let range = null;
+  
+  // Check window selection first
+  if (sel && sel.isCollapsed) {
+    // Try to get selection from iframe document (for mobile/iOS)
+    const iframe = document.getElementById("epubViewer");
+    if (iframe) {
+      const iframeDoc = iframe.querySelector("iframe")?.contentDocument || iframe.contentDocument;
+      if (iframeDoc) {
+        sel = iframeDoc.getSelection();
+      }
+    }
+  }
+  
   if (!sel || sel.isCollapsed) {
     document.getElementById("hlToolbar").style.display = "none";
     return;
@@ -1952,7 +2047,7 @@ function handleTextSelectionForHighlight() {
   if (!reader) return;
   
   // Check if selection is within the reader
-  const range = sel.getRangeAt(0);
+  range = sel.getRangeAt(0);
   if (range && reader.contains(range.commonAncestorContainer)) {
     pendingHighlightText = text;
     currentSelectionRange = range;

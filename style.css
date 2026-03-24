@@ -248,6 +248,13 @@ body.dark #epubViewer span[data-char-name] {
 /* Ensure underline style is more visible in dark mode - thicker and more opaque */
 body.dark #epubViewer span[data-char-name][style*="border-bottom"] {
   border-bottom-width: 4px !important;
+  padding-bottom: 3px !important;
+}
+
+/* Ensure user underlines are visible in dark mode */
+body.dark .user-underline {
+  border-bottom-width: 4px !important;
+  padding-bottom: 3px !important;
 }
 
 /* Dark mode - stronger contrast for solid and ombre styles */
@@ -1166,8 +1173,8 @@ body.dark .font-select {
 
   /* User highlight/underline styles in text */
   .user-highlight {
-    background-color: rgba(255, 235, 59, 0.4);
-    padding: 1px 0;
+    background-color: rgba(255, 235, 59, 0.4) !important;
+    padding: 1px 0 !important;
     border-radius: 2px;
     cursor: pointer;
     transition: opacity 0.2s;
@@ -1177,10 +1184,12 @@ body.dark .font-select {
   }
   
   .user-underline {
-    border-bottom: 2px solid #2196F3;
-    padding: 1px 0;
+    border-bottom: 3px solid #2196F3 !important;
+    padding-bottom: 2px !important;
     cursor: pointer;
     transition: opacity 0.2s;
+    display: inline !important;
+    position: relative !important;
   }
   .user-underline:hover {
     opacity: 0.8;
