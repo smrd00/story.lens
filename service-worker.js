@@ -1,5 +1,5 @@
 // StoryLens Service Worker
-const CACHE_NAME = 'storylens-v1';
+const CACHE_NAME = 'storylens-v2';
 const urlsToCache = [
   './index.html',
   './style.css',
@@ -10,7 +10,10 @@ const urlsToCache = [
   './fonts/OpenDyslexic/OpenDyslexic-Regular.otf',
   './fonts/OpenDyslexic/OpenDyslexic-Bold.otf',
   './fonts/OpenDyslexic/OpenDyslexic-Italic.otf',
-  './fonts/OpenDyslexic/OpenDyslexic-BoldItalic.otf'
+  './fonts/OpenDyslexic/OpenDyslexic-BoldItalic.otf',
+  './fonts/OpenDyslexic/OpenDyslexicAlta-Regular.otf',
+  './fonts/OpenDyslexic/OpenDyslexicAlta-Bold.otf',
+  './fonts/OpenDyslexic/OpenDyslexicMono-Regular.otf'
 ];
 
 // Install event - cache resources

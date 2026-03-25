@@ -46,9 +46,8 @@ let currentFont = 'default'; // 'default' | 'literata' | 'merriweather' | 'lora'
 let characterStyles    = {}; // per-character style: "underline" | "solid" | "ombre"
 let characterIcons     = {}; // per-character icon: "none" | "star" | "dot" | "triangle" | "diamond"
 
-// Highlights and underlines storage (per book)
-let highlights = []; // Array of { id, text, bookName, page, type: 'highlight'|'underline', color, date }
-let underlines = [];
+// Highlights storage (per book)
+let highlights = []; // Array of { id, text, bookName, page, type: 'highlight', color, date }
 
 const DYSLEXIC_FONT_CSS = `
   @font-face {
@@ -64,7 +63,7 @@ const DYSLEXIC_FONT_CSS = `
 const DB_NAME    = "StoryLensLibrary";
 const DB_VERSION = 2; // Incremented to trigger upgrade for highlights store
 const STORE_NAME = "books";
-const HL_STORE_NAME = "highlights"; // Store for highlights and underlines
+const HL_STORE_NAME = "highlights"; // Store for highlights
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -470,7 +469,7 @@ function loadEPUB(arrayBuffer, filename) {
     injectCapitalWordClicker(contents);
     applyFontToContents(contents);
     
-    // Add selection handler for highlight/underline in EPUB
+    // Add selection handler for highlight in EPUB
     const doc = contents.document;
     if (doc._hlSelectionHandler) {
       doc.removeEventListener("mouseup", doc._hlSelectionHandler);
@@ -478,8 +477,8 @@ function loadEPUB(arrayBuffer, filename) {
       doc.removeEventListener("selectionchange", doc._hlSelectionChangeHandler);
     }
     doc._hlSelectionHandler = function(e) {
-      // Prevent default to keep selection
-      if (e) e.preventDefault();
+      // Don't prevent default on touchend - let iOS handle text selection
+      // We just want to detect and display the toolbar for existing selections
       setTimeout(function() {
         const sel = doc.getSelection();
         if (!sel || sel.isCollapsed) {
@@ -544,17 +543,15 @@ function loadEPUB(arrayBuffer, filename) {
       doc.removeEventListener("click", doc._hlClickHandler);
     }
     doc._hlClickHandler = function(e) {
-      // Check if clicking on a highlighted span or underlined span
+      // Check if clicking on a highlighted span
       const isHighlight = e.target && e.target.classList && e.target.classList.contains("user-highlight");
-      const isUnderline = e.target && e.target.classList && e.target.classList.contains("user-underline");
       
-      if (isHighlight || isUnderline) {
+      if (isHighlight) {
         e.preventDefault();
         e.stopPropagation();
         
         const highlightSpan = e.target;
         const rect = highlightSpan.getBoundingClientRect();
-        const isUnderlineSpan = isUnderline;
         
         // Get iframe position
         const iframe = document.getElementById("epubViewer").querySelector("iframe");
@@ -567,7 +564,6 @@ function loadEPUB(arrayBuffer, filename) {
         
         // Store reference to the span for later
         window._currentHighlightSpan = highlightSpan;
-        window._currentHighlightSpanIsUnderline = isUnderlineSpan;
         
         // Show popup
         const popup = document.getElementById("hlManagePopup");
@@ -582,28 +578,12 @@ function loadEPUB(arrayBuffer, filename) {
           swatch.style.backgroundColor = color;
           swatch.addEventListener("click", function(evt) {
             evt.stopPropagation();
-            // Change color based on type
-            if (isUnderlineSpan) {
-              // Change underline color (border-bottom)
-              highlightSpan.style.borderBottomColor = color;
-              // Update the injected style for this color
-              const iframe = document.getElementById("epubViewer").querySelector("iframe");
-              if (iframe && iframe.contentDocument) {
-                injectUnderlineStyles(iframe.contentDocument, color);
-              }
-              // Also update the data in DB
-              const hlId = highlightSpan.dataset.hlId;
-              if (hlId) {
-                updateHighlightColorInDB(parseInt(hlId), color);
-              }
-            } else {
-              // Change highlight color (background)
-              highlightSpan.style.backgroundColor = color + "66";
-              // Also update the data in DB
-              const hlId = highlightSpan.dataset.hlId;
-              if (hlId) {
-                updateHighlightColorInDB(parseInt(hlId), color);
-              }
+            // Change highlight color
+            highlightSpan.style.backgroundColor = color + "66";
+            // Also update the data in DB
+            const hlId = highlightSpan.dataset.hlId;
+            if (hlId) {
+              updateHighlightColorInDB(parseInt(hlId), color);
             }
             popup.style.display = "none";
           });
@@ -625,10 +605,10 @@ function loadEPUB(arrayBuffer, filename) {
         
         // Setup delete button
         const deleteBtn = document.getElementById("hlDeleteBtn");
-        deleteBtn.textContent = isUnderlineSpan ? "Delete Underline" : "Delete Highlight";
+        deleteBtn.textContent = "Delete Highlight";
         deleteBtn.onclick = function(evt) {
           evt.stopPropagation();
-          // Remove the highlight/underline
+          // Remove the highlight
           const text = highlightSpan.textContent;
           const parent = highlightSpan.parentNode;
           while (highlightSpan.firstChild) {
@@ -641,15 +621,27 @@ function loadEPUB(arrayBuffer, filename) {
           const hlId = highlightSpan.dataset.hlId;
           if (hlId) {
             deleteHighlightFromDB(parseInt(hlId));
+            // Remove from local highlights array and update UI
+            highlights = highlights.filter(h => h.id !== parseInt(hlId));
+            // Re-render the highlights list in sidebar if visible
+            renderHighlightsList();
+            renderAllHighlightsPage();
           }
         };
         
         return;
       }
       
-      // Close popup when clicking elsewhere
+      // Close popup when clicking elsewhere (but not on popup elements)
       const popup = document.getElementById("hlManagePopup");
       if (popup && popup.style.display === "block") {
+        // Check if click is inside the popup
+        const rect = popup.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          // Click is inside popup, don't close
+          return;
+        }
         popup.style.display = "none";
       }
     };
@@ -1032,7 +1024,7 @@ async function renderHighlightsList() {
     const allHighlights = await getAllHighlights();
     
     if (allHighlights.length === 0) {
-      list.innerHTML = "<p class='sidebar-hint'>No highlights or underlines yet. Select text while reading to add some!</p>";
+      list.innerHTML = "<p class='sidebar-hint'>No highlights yet. Select text while reading to highlight!</p>";
       return;
     }
     
@@ -1186,10 +1178,9 @@ function applySpanStyle(span, color, style, icon) {
       span.style.borderRadius     = "8px"; // More rounded corners
       span.style.color            = "#000000";
     } else {
-      // Rounded underline style - thicker and more visible
-      span.style.borderBottom  = "3px dashed " + color;
+      // Full underline style - solid line instead of dashed
+      span.style.borderBottom  = "3px solid " + color;
       span.style.paddingBottom = "2px";
-      span.style.borderRadius  = "2px";
     }
   }
 
@@ -1284,38 +1275,48 @@ function attachSpanHandlers(s) {
   }, { passive: true });
   
   s.addEventListener("touchend", function(e) {
+    // Check if user is selecting text - if so, don't interfere
+    const sel = s.ownerDocument ? s.ownerDocument.getSelection() : null;
+    if (sel && sel.toString().trim().length > 0) {
+      // User is selecting text, let the default behavior happen
+      return;
+    }
+    
+    // Check if this is a tap (not a scroll or selection gesture)
+    const touch = e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0] : null;
+    if (!touch) return;
+    
+    // Calculate touch movement
+    const dx = touch.clientX - (s._touchStartX || 0);
+    const dy = touch.clientY - (s._touchStartY || 0);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Only activate for taps (minimal movement) - allow text selection to proceed
+    if (distance > 15) return; // Allow movement for text selection
+    
     e.preventDefault();
     e.stopPropagation();
     
-    let absX, absY;
-    // Use stored touch coordinates or current
-    if (e.changedTouches && e.changedTouches.length > 0) {
-      absX = e.changedTouches[0].clientX;
-      absY = e.changedTouches[0].clientY;
-    } else if (s._touchStartX !== undefined) {
-      absX = s._touchStartX;
-      absY = s._touchStartY;
-    }
+    let absX = touch.clientX;
+    let absY = touch.clientY;
     
-    if (absX !== undefined && absY !== undefined) {
-      const charName = s.dataset.charName;
-      
-      try {
-        const iframes = window.parent.document.querySelectorAll("iframe");
-        iframes.forEach(function(iframe) {
-          if (iframe.contentWindow === window) {
-            const rect = iframe.getBoundingClientRect();
-            absX += rect.left;
-            absY += rect.top;
-          }
-        });
-      } catch(err) {}
+    const charName = s.dataset.charName;
+    
+    try {
+      const iframes = window.parent.document.querySelectorAll("iframe");
+      iframes.forEach(function(iframe) {
+        if (iframe.contentWindow === window) {
+          const rect = iframe.getBoundingClientRect();
+          absX += rect.left;
+          absY += rect.top;
+        }
+      });
+    } catch(err) {}
 
-      const opener = (window.parent && window.parent.openInlineColorPicker)
-        ? window.parent.openInlineColorPicker
-        : openInlineColorPicker;
-      opener(charName, absX, absY);
-    }
+    const opener = (window.parent && window.parent.openInlineColorPicker)
+      ? window.parent.openInlineColorPicker
+      : openInlineColorPicker;
+    opener(charName, absX, absY);
   }, { passive: false });
   
   // Keep click handler as fallback for non-touch devices
@@ -1332,6 +1333,39 @@ function escapeRegex(str) {
 // ============================================================
 function injectCapitalWordClicker(contents) {
   const doc = contents.document;
+
+  // Inject CSS to enable text selection on iOS
+  // This is critical for text selection to work on iOS Safari
+  let selectionStyle = doc.getElementById("sl-selection-style");
+  if (!selectionStyle) {
+    selectionStyle = doc.createElement("style");
+    selectionStyle.id = "sl-selection-style";
+    selectionStyle.textContent = `
+      html, body {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      * {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
+      }
+      /* Allow text selection in character spans */
+      span[data-char-name] {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
+      }
+      /* Except for icon elements inside spans */
+      span[data-icon] {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+      }
+    `;
+    doc.head.appendChild(selectionStyle);
+  }
 
   // --- mouseup handler ---
   if (doc._capitalClickHandler) {
@@ -1362,15 +1396,34 @@ function injectCapitalWordClicker(contents) {
   };
   doc.addEventListener("touchstart", doc._touchStartHandler, { passive: true });
   
+  // Handle touchcancel to reset touch state
+  if (doc._touchCancelHandler) {
+    doc.removeEventListener("touchcancel", doc._touchCancelHandler);
+  }
+  doc._touchCancelHandler = function(e) {
+    touchStartX = 0;
+    touchStartY = 0;
+  };
+  doc.addEventListener("touchcancel", doc._touchCancelHandler, { passive: true });
+   
   doc._capitalTouchHandler = function(e) {
+    // Check if user is selecting text - if so, don't interfere with selection
+    const sel = doc.getSelection ? doc.getSelection() : null;
+    if (sel && sel.toString().trim().length > 0) {
+      // User is selecting text, don't prevent default
+      return;
+    }
+    
     // Check if this is a tap (not a swipe) - minimal movement
     let dx = 0, dy = 0;
     if (e.changedTouches && e.changedTouches.length > 0) {
       dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
       dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
     }
-    // Only handle as tap if movement is minimal
-    if (dx < 10 && dy < 10) {
+    
+    // Only handle as tap if movement is minimal (less than 15px to allow for text selection)
+    // Also check that it's not a long press (which iOS uses for text selection)
+    if (dx < 15 && dy < 15) {
       e.preventDefault();
     }
     handleWordInteraction(e, contents, "touch");
@@ -1827,7 +1880,7 @@ document.addEventListener("click", function(e) {
 // ============================================================
 let currentSelectionRange = null;
 
-// Colors for highlights and underlines
+// Colors for highlights
 const HL_COLORS = [
   "#FFEB3B", // Yellow
   "#4CAF50", // Green
@@ -1838,11 +1891,11 @@ const HL_COLORS = [
 ];
 
 let pendingHighlightText = "";
-let pendingHighlightType = ""; // "highlight" or "underline"
+let pendingHighlightType = "highlight"; // always "highlight" now
 
 // Initialize highlight color palette in toolbar
 function initHighlightToolbar() {
-  // Create color options for highlight/underline
+  // Create color options for highlight
   let colorRow = document.getElementById("hlColorRow");
   if (!colorRow) {
     colorRow = document.createElement("div");
@@ -1866,7 +1919,7 @@ function initHighlightToolbar() {
   });
 }
 
-// Apply highlight or underline to selected text
+// Apply highlight to selected text
 async function applyHighlightOrUnderline(color, type) {
   if (!pendingHighlightText || !currentSelectionRange) return;
   
@@ -1874,7 +1927,7 @@ async function applyHighlightOrUnderline(color, type) {
     text: pendingHighlightText,
     bookName: currentBookName,
     page: currentPage,
-    type: type, // "highlight" or "underline"
+    type: "highlight",
     color: color,
     date: Date.now()
   };
@@ -1886,10 +1939,10 @@ async function applyHighlightOrUnderline(color, type) {
   // Add to local array
   highlights.push(highlight);
   
-  // Apply visual highlight/underline to the selection with the ID
-  applyVisualHighlight(currentSelectionRange, type, color, id);
+  // Apply visual highlight to the selection with the ID
+  applyVisualHighlight(currentSelectionRange, "highlight", color, id);
   
-  showToast(type === "highlight" ? "Text highlighted!" : "Text underlined!");
+  showToast("Text highlighted!");
   
   // Clear selection
   if (window.getSelection) {
@@ -1897,27 +1950,7 @@ async function applyHighlightOrUnderline(color, type) {
   }
   currentSelectionRange = null;
   pendingHighlightText = "";
-  pendingHighlightType = "";
-}
-
-// Inject underline styles into iframe document to ensure visibility
-function injectUnderlineStyles(doc, color) {
-  if (!doc) return;
-  
-  // Check if style already injected
-  if (doc.getElementById('user-underline-styles')) return;
-  
-  const style = doc.createElement('style');
-  style.id = 'user-underline-styles';
-  style.textContent = `
-    .user-underline {
-      border-bottom: 3px solid ${color} !important;
-      padding-bottom: 2px !important;
-      display: inline !important;
-      position: relative !important;
-    }
-  `;
-  doc.head.appendChild(style);
+  pendingHighlightType = "highlight";
 }
 
 // Apply visual highlight to the DOM
@@ -1941,22 +1974,13 @@ function applyVisualHighlight(range, type, color, id) {
     
     console.log("Applying highlight, type:", type, "color:", color, "doc:", contents);
     
-    // Always apply highlight (type is always "highlight" now)
+    // Always apply highlight
     const span = contents.createElement("span");
-    span.className = type === "underline" ? "user-underline" : "user-highlight";
-    
-    if (type === "underline") {
-      // For underline, use border-bottom with stronger styling
-      span.style.borderBottom = "3px solid " + color;
-      span.style.paddingBottom = "2px";
-      // Inject underline styles into the iframe document to ensure they're applied
-      injectUnderlineStyles(contents, color);
-    } else {
-      span.style.backgroundColor = color + "66"; // Add transparency
-    }
+    span.className = "user-highlight";
+    span.style.backgroundColor = color + "66"; // Add transparency
     
     span.dataset.hlDate = Date.now();
-    span.dataset.hlType = type; // Store the type for display
+    span.dataset.hlType = type;
     if (id) {
       span.dataset.hlId = id;
     }
@@ -1985,7 +2009,7 @@ function applyVisualHighlight(range, type, color, id) {
   }
 }
 
-// Show the highlight/underline toolbar at the selection position
+// Show the highlight toolbar at the selection position
 function showHighlightToolbar(range) {
   const toolbar = document.getElementById("hlToolbar");
   if (!toolbar || !range) return;
@@ -2097,42 +2121,6 @@ document.getElementById("hlHighlight").addEventListener("click", function(e) {
   document.getElementById("hlToolbar").style.display = "none";
 });
 
-// Toolbar button handler - underline selected text
-document.getElementById("hlUnderline").addEventListener("click", function(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  
-  console.log("Underline button clicked, pendingHighlightText:", pendingHighlightText);
-  
-  if (!pendingHighlightText) {
-    // Try to get selection from EPUB iframe
-    try {
-      const iframe = document.getElementById("epubViewer").querySelector("iframe");
-      if (iframe && iframe.contentDocument) {
-        const sel = iframe.contentDocument.getSelection();
-        if (sel && sel.toString().trim().length > 0) {
-          pendingHighlightText = sel.toString().trim();
-          currentSelectionRange = sel.getRangeAt(0).cloneRange();
-          console.log("Got fresh selection:", pendingHighlightText);
-        }
-      }
-    } catch(err) {
-      console.log("Error getting selection:", err);
-    }
-  }
-  
-  if (!pendingHighlightText) {
-    console.log("Still no selection found");
-    return;
-  }
-  
-  pendingHighlightType = "underline";
-  
-  // Apply underline with blue color
-  applyHighlightOrUnderline("#2196F3", "underline");
-  document.getElementById("hlToolbar").style.display = "none";
-});
-
 // ============================================================
 //  DARK MODE
 // ============================================================
@@ -2214,7 +2202,7 @@ async function renderAllHighlightsPage() {
     const allHighlights = await getAllHighlights();
     
     if (allHighlights.length === 0) {
-      list.innerHTML = "<p style='text-align:center;color:var(--text-muted);padding:40px;'>No highlights yet. Select text while reading to add highlights!</p>";
+      list.innerHTML = "<p style='text-align:center;color:var(--text-muted);padding:40px;'>No highlights yet. Select text while reading to highlight!</p>";
       return;
     }
     
@@ -2228,16 +2216,9 @@ async function renderAllHighlightsPage() {
       // Create indicator
       const indicator = document.createElement("span");
       indicator.className = "highlight-indicator";
-      if (hl.type === "underline") {
-        // For underlines, show a border-bottom indicator
-        indicator.style.borderBottom = "3px solid " + hl.color;
-        indicator.style.flexShrink = "0";
-        indicator.style.width = "20px";
-      } else {
-        // For highlights, show a colored background indicator
-        indicator.style.backgroundColor = hl.color + "66";
-        indicator.style.border = "2px solid " + hl.color;
-      }
+      // Show colored background indicator
+      indicator.style.backgroundColor = hl.color + "66";
+      indicator.style.border = "2px solid " + hl.color;
       div.appendChild(indicator);
       
       // Text content
