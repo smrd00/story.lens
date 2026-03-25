@@ -1145,7 +1145,7 @@ function highlightCharacters(contents) {
   });
 }
 
-const ICON_MAP = { star: "★", dot: "●", triangle: "▲", diamond: "◆" };
+const ICON_MAP = { star: "★", dot: "●", triangle: "▲", diamond: "◆", pencil: "✏️" };
 
 function applySpanStyle(span, color, style, icon) {
   // Reset
@@ -1222,6 +1222,9 @@ function adjustColorBrightness(hex, percent) {
 }
 
 function attachSpanHandlers(s) {
+  // Double-tap detection for text selection
+  s._lastTap = 0;
+  
   function handleActivation(e) {
     e.stopPropagation();
     const charName = s.dataset.charName;
@@ -1275,6 +1278,35 @@ function attachSpanHandlers(s) {
   }, { passive: true });
   
   s.addEventListener("touchend", function(e) {
+    // Check for double-tap to select text
+    const now = Date.now();
+    const timeDiff = now - (s._lastTap || 0);
+    
+    if (timeDiff < 300 && timeDiff > 0) {
+      // Double-tap detected - select the text of this character name
+      e.preventDefault();
+      e.stopPropagation();
+      
+      try {
+        const doc = s.ownerDocument;
+        const sel = doc.getSelection();
+        if (sel) {
+          // Select the text content of this span
+          const range = doc.createRange();
+          range.selectNodeContents(s);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      } catch(err) {
+        console.log("Could not select text:", err);
+      }
+      
+      s._lastTap = 0;
+      return;
+    }
+    
+    s._lastTap = now;
+    
     // Check if user is selecting text - if so, don't interfere
     const sel = s.ownerDocument ? s.ownerDocument.getSelection() : null;
     if (sel && sel.toString().trim().length > 0) {
@@ -1321,6 +1353,26 @@ function attachSpanHandlers(s) {
   
   // Keep click handler as fallback for non-touch devices
   s.addEventListener("click", handleActivation);
+  
+  // Add double-click handler for desktop text selection
+  s.addEventListener("dblclick", function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    try {
+      const doc = s.ownerDocument;
+      const sel = doc.getSelection();
+      if (sel) {
+        // Select the text content of this span
+        const range = doc.createRange();
+        range.selectNodeContents(s);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    } catch(err) {
+      console.log("Could not select text:", err);
+    }
+  });
 }
 
 function escapeRegex(str) {
@@ -1351,21 +1403,76 @@ function injectCapitalWordClicker(contents) {
         -webkit-user-select: text !important;
         user-select: text !important;
         -webkit-touch-callout: default !important;
+        -webkit-highlight: none;
       }
       /* Allow text selection in character spans */
       span[data-char-name] {
         -webkit-user-select: text !important;
         user-select: text !important;
         -webkit-touch-callout: default !important;
+        -webkit-highlight: none;
       }
       /* Except for icon elements inside spans */
       span[data-icon] {
         -webkit-user-select: none !important;
         user-select: none !important;
+        pointer-events: none;
       }
     `;
     doc.head.appendChild(selectionStyle);
   }
+
+  // --- selectionchange handler (more reliable on iOS) ---
+  if (doc._selectionChangeHandler) {
+    doc.removeEventListener("selectionchange", doc._selectionChangeHandler);
+  }
+  doc._selectionChangeHandler = function() {
+    // iOS selection change handler - check for text selection
+    setTimeout(function() {
+      const sel = doc.getSelection ? doc.getSelection() : null;
+      if (sel && sel.toString().trim().length > 0) {
+        // Text is being selected - notify parent
+        const selectedText = sel.toString().trim();
+        if (selectedText.length >= 2 && selectedText.indexOf(' ') >= 0) {
+          // Multi-word selection - show highlight toolbar
+          try {
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            
+            // Get iframe position
+            const iframe = document.getElementById("epubViewer").querySelector("iframe");
+            let iframeX = 0, iframeY = 0;
+            if (iframe) {
+              const ifRect = iframe.getBoundingClientRect();
+              iframeX = ifRect.left;
+              iframeY = ifRect.top;
+            }
+            
+            const absX = rect.left + rect.width / 2 + iframeX;
+            const absY = rect.bottom + iframeY;
+            
+            pendingHighlightText = selectedText;
+            currentSelectionRange = range.cloneRange();
+            window._hlSelectionDoc = doc;
+            
+            const toolbar = document.getElementById("hlToolbar");
+            if (toolbar) {
+              const vw = window.innerWidth, vh = window.innerHeight;
+              const toolbarWidth = 200;
+              let x = Math.min(absX - toolbarWidth / 2, vw - toolbarWidth - 10);
+              let y = Math.min(absY + 10, vh - 100);
+              x = Math.max(10, x);
+              y = Math.max(10, y);
+              toolbar.style.left = x + "px";
+              toolbar.style.top = y + "px";
+              toolbar.style.display = "block";
+            }
+          } catch(err) {}
+        }
+      }
+    }, 10);
+  };
+  doc.addEventListener("selectionchange", doc._selectionChangeHandler);
 
   // --- mouseup handler ---
   if (doc._capitalClickHandler) {
@@ -1405,12 +1512,23 @@ function injectCapitalWordClicker(contents) {
     touchStartY = 0;
   };
   doc.addEventListener("touchcancel", doc._touchCancelHandler, { passive: true });
+  
+  // Handle touchmove to allow scrolling without interference
+  if (doc._touchMoveHandler) {
+    doc.removeEventListener("touchmove", doc._touchMoveHandler);
+  }
+  doc._touchMoveHandler = function(e) {
+    // User is scrolling - reset touch state
+    touchStartX = 0;
+    touchStartY = 0;
+  };
+  doc.addEventListener("touchmove", doc._touchMoveHandler, { passive: true });
    
   doc._capitalTouchHandler = function(e) {
     // Check if user is selecting text - if so, don't interfere with selection
     const sel = doc.getSelection ? doc.getSelection() : null;
     if (sel && sel.toString().trim().length > 0) {
-      // User is selecting text, don't prevent default
+      // User is selecting text, don't prevent default or interfere
       return;
     }
     
@@ -1421,10 +1539,13 @@ function injectCapitalWordClicker(contents) {
       dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
     }
     
-    // Only handle as tap if movement is minimal (less than 15px to allow for text selection)
-    // Also check that it's not a long press (which iOS uses for text selection)
-    if (dx < 15 && dy < 15) {
-      e.preventDefault();
+    // Only handle as tap if movement is minimal (less than 10px for iOS)
+    // On iOS, text selection gestures need more room to work
+    if (dx < 10 && dy < 10) {
+      // Only prevent default for actual taps on text (not character spans)
+      if (!e.target || !e.target.dataset || !e.target.dataset.charName) {
+        e.preventDefault();
+      }
     }
     handleWordInteraction(e, contents, "touch");
   };
@@ -1435,6 +1556,13 @@ function injectCapitalWordClicker(contents) {
     doc.removeEventListener("click", doc._capitalTapHandler);
   }
   doc._capitalTapHandler = function(e) {
+    // Check if there's an active text selection
+    const sel = doc.getSelection ? doc.getSelection() : null;
+    if (sel && sel.toString().trim().length > 0) {
+      // There's a selection - don't interfere
+      return;
+    }
+    
     // Check if clicking on an already colored character - show color picker
     if (e.target && e.target.dataset && e.target.dataset.charName) {
       const name = e.target.dataset.charName;
