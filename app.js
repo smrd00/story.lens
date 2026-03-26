@@ -468,6 +468,7 @@ function loadEPUB(arrayBuffer, filename) {
     }
     injectCapitalWordClicker(contents);
     applyFontToContents(contents);
+    injectTextSelectionStyles(contents);
     
     // Add selection handler for highlight in EPUB
     const doc = contents.document;
@@ -865,6 +866,48 @@ const FONT_FAMILIES = {
   atkinson:     '"Atkinson Hyperlegible", Arial, sans-serif',
   opendyslexic: '"OpenDyslexic", sans-serif',
 };
+
+function injectTextSelectionStyles(contents) {
+  // Remove old style if exists
+  const old = contents.document.getElementById("sl-touch-select-style");
+  if (old) old.remove();
+
+  // Inject styles to enable text selection on touch devices
+  const style = contents.document.createElement("style");
+  style.id = "sl-touch-select-style";
+  style.textContent = `
+    * {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+      -webkit-touch-select: text !important;
+      touch-action: auto !important;
+      pointer-events: auto !important;
+    }
+    html, body {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+      touch-action: pan-y !important;
+    }
+    span[data-char-name] {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+      -webkit-touch-select: text !important;
+      touch-action: auto !important;
+      pointer-events: auto !important;
+      cursor: text !important;
+    }
+    ::selection {
+      background: rgba(90, 62, 40, 0.3) !important;
+    }
+    ::-webkit-selection {
+      background: rgba(90, 62, 40, 0.3) !important;
+    }
+  `;
+  contents.document.head.appendChild(style);
+}
 
 function applyFontToContents(contents) {
   // remove old injected style
@@ -1270,10 +1313,11 @@ function attachSpanHandlers(s) {
   // Add touchstart for immediate response on iOS
   s.addEventListener("touchstart", function(e) {
     e.stopPropagation();
-    // Store touch coordinates for use in touchend
+    // Store touch coordinates and time for use in touchend
     if (e.changedTouches && e.changedTouches.length > 0) {
       s._touchStartX = e.changedTouches[0].clientX;
       s._touchStartY = e.changedTouches[0].clientY;
+      s._touchStartTime = Date.now();
     }
   }, { passive: true });
   
@@ -1323,32 +1367,50 @@ function attachSpanHandlers(s) {
     const dy = touch.clientY - (s._touchStartY || 0);
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // Only activate for taps (minimal movement) - allow text selection to proceed
-    if (distance > 15) return; // Allow movement for text selection
+    // Allow more movement for text selection (40px threshold)
+    // If user moves more than this, they're likely selecting text
+    if (distance > 40) {
+      // User is likely selecting text - don't intercept
+      // The selection will be handled by the system
+      return;
+    }
     
-    e.preventDefault();
-    e.stopPropagation();
+    // For short touches (likely taps), use a delay to allow text selection to complete
+    // This prevents blocking text selection while still allowing tap-to-color
+    const touchDuration = (s._touchStartTime || now) - now;
     
-    let absX = touch.clientX;
-    let absY = touch.clientY;
-    
-    const charName = s.dataset.charName;
-    
-    try {
-      const iframes = window.parent.document.querySelectorAll("iframe");
-      iframes.forEach(function(iframe) {
-        if (iframe.contentWindow === window) {
-          const rect = iframe.getBoundingClientRect();
-          absX += rect.left;
-          absY += rect.top;
-        }
-      });
-    } catch(err) {}
+    // If touch was very short (< 150ms), it's likely a deliberate tap
+    // Show the picker after a short delay to allow text selection to be cancelled
+    setTimeout(function() {
+      // Check again if text selection happened during the delay
+      const currentSel = s.ownerDocument ? s.ownerDocument.getSelection() : null;
+      if (currentSel && currentSel.toString().trim().length > 0) {
+        // User selected text, don't show picker
+        return;
+      }
+      
+      // No text was selected, show the color picker
+      let absX = touch.clientX;
+      let absY = touch.clientY;
+      
+      const charName = s.dataset.charName;
+      
+      try {
+        const iframes = window.parent.document.querySelectorAll("iframe");
+        iframes.forEach(function(iframe) {
+          if (iframe.contentWindow === window) {
+            const rect = iframe.getBoundingClientRect();
+            absX += rect.left;
+            absY += rect.top;
+          }
+        });
+      } catch(err) {}
 
-    const opener = (window.parent && window.parent.openInlineColorPicker)
-      ? window.parent.openInlineColorPicker
-      : openInlineColorPicker;
-    opener(charName, absX, absY);
+      const opener = (window.parent && window.parent.openInlineColorPicker)
+        ? window.parent.openInlineColorPicker
+        : openInlineColorPicker;
+      opener(charName, absX, absY);
+    }, 100);
   }, { passive: false });
   
   // Keep click handler as fallback for non-touch devices

@@ -1415,7 +1415,11 @@ body.dark .font-select {
   -webkit-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
+  -webkit-touch-select: text !important;
   touch-action: auto !important;
+  -webkit-user-callout: default !important;
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 /* Allow selection handles to appear on iOS */
@@ -1435,15 +1439,24 @@ body {
   user-select: text !important;
 }
 
-/* Reader content area */
+/* Reader content area - allow text selection */
 #reader {
-  -webkit-user-select: none;
-  user-select: none;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  touch-action: pan-y !important;
 }
 
-/* But allow text selection inside the EPUB viewer */
+/* Allow text selection inside the EPUB viewer */
 #reader #epubViewer,
 #reader #epubViewer iframe {
   -webkit-user-select: text !important;
   user-select: text !important;
+  touch-action: auto !important;
+}
+
+/* Ensure readingContent allows touch text selection */
+#readingContent {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  touch-action: pan-y !important;
 }
