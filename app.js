@@ -508,6 +508,7 @@ function loadEPUB(arrayBuffer, filename) {
           
           pendingHighlightText = selectedText;
           currentSelectionRange = range.cloneRange();
+          window._hlSelectionDoc = doc;
           
           const toolbar = document.getElementById("hlToolbar");
           if (toolbar) {
@@ -528,7 +529,8 @@ function loadEPUB(arrayBuffer, filename) {
       }, 50);
     };
     doc.addEventListener("mouseup", doc._hlSelectionHandler);
-    doc.addEventListener("touchend", doc._hlSelectionHandler);
+    // Use passive listener for touchend to not block text selection
+    doc.addEventListener("touchend", doc._hlSelectionHandler, { passive: true });
     
     // Also listen for selectionchange on the iframe document (for mobile)
     if (doc._hlSelectionChangeHandler) {
@@ -1307,8 +1309,8 @@ function attachSpanHandlers(s) {
     opener(charName, absX, absY);
   }
 
-  // Use pointer events for better cross-device support
-  s.style.touchAction = "manipulation";
+  // Use auto touch-action to allow text selection on touch devices
+  s.style.touchAction = "auto";
   
   // Add touchstart for immediate response on iOS
   s.addEventListener("touchstart", function(e) {
@@ -1601,34 +1603,35 @@ function injectCapitalWordClicker(contents) {
       dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
     }
     
-    // Only handle as tap if movement is minimal (less than 10px for iOS)
-    // On iOS, text selection gestures need more room to work
-    if (dx < 10 && dy < 10) {
-      // Only prevent default for actual taps on text (not character spans)
-      if (!e.target || !e.target.dataset || !e.target.dataset.charName) {
-        e.preventDefault();
-      }
+    // Allow more movement for text selection (30px threshold)
+    // On iOS, text selection gestures need room to work
+    if (dx > 30 || dy > 30) {
+      // User is likely selecting text - don't intercept
+      return;
     }
+    
+    // Don't prevent default for touchend - let the browser handle text selection
+    // Just proceed with word interaction if this was a tap
     handleWordInteraction(e, contents, "touch");
   };
-  doc.addEventListener("touchend", doc._capitalTouchHandler, { passive: false });
+  doc.addEventListener("touchend", doc._capitalTouchHandler, { passive: true });
    
   // Also add click handler for iOS Safari which sometimes converts taps to clicks
   if (doc._capitalTapHandler) {
     doc.removeEventListener("click", doc._capitalTapHandler);
   }
   doc._capitalTapHandler = function(e) {
-    // Check if there's an active text selection
+    // Check if there's an active text selection - don't interfere
     const sel = doc.getSelection ? doc.getSelection() : null;
     if (sel && sel.toString().trim().length > 0) {
-      // There's a selection - don't interfere
+      // There's a selection - let it be, don't show color picker
       return;
     }
     
     // Check if clicking on an already colored character - show color picker
     if (e.target && e.target.dataset && e.target.dataset.charName) {
       const name = e.target.dataset.charName;
-      e.preventDefault();
+      // Don't prevent default - this prevents text selection on some devices
       e.stopPropagation();
       
       // Get position for popup
