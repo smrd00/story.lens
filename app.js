@@ -1123,7 +1123,7 @@ function highlightCharacters(contents) {
       const spanTemplate = doc.createElement("span");
       spanTemplate.style.cursor = "pointer";
       spanTemplate.dataset.charName = name;
-      applySpanStyle(spanTemplate, color, characterStyles[name] || "underline", icon);
+      applySpanStyle(spanTemplate, color, getActiveStyle(name), icon);
 
       const parts    = node.nodeValue.split(new RegExp("(" + escapeRegex(name) + ")"));
       const fragment = doc.createDocumentFragment();
@@ -1134,7 +1134,7 @@ function highlightCharacters(contents) {
         } else {
           const s = spanTemplate.cloneNode(false); // shallow clone — no icon child yet
           s.textContent = part;
-          applySpanStyle(s, color, characterStyles[name] || "underline", icon);
+          applySpanStyle(s, color, getActiveStyle(name), icon);
           attachSpanHandlers(s);
           fragment.appendChild(s);
         }
@@ -2426,3 +2426,46 @@ document.getElementById("readerHighlightsBtn").addEventListener("click", functio
 document.getElementById("hlBackBtn").addEventListener("click", function() {
   hideHighlightsPage();
 });
+
+// Underline style toggle button - cycles through underline, solid, ombre
+document.getElementById("underlineStyleBtn").addEventListener("click", function() {
+  const styles = ["underline", "solid", "ombre"];
+  const icons = {
+    "underline": '<path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>',
+    "solid": '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>',
+    "ombre": '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>'
+  };
+  
+  // Get current style or default to underline
+  const currentStyle = currentUnderlineStyle || "underline";
+  const currentIndex = styles.indexOf(currentStyle);
+  const nextIndex = (currentIndex + 1) % styles.length;
+  currentUnderlineStyle = styles[nextIndex];
+  
+  // Update button icon
+  const btn = document.getElementById("underlineStyleBtn");
+  btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + icons[currentUnderlineStyle] + '</svg>';
+  
+  // Apply to all existing character spans
+  if (rendition) {
+    rendition.getContents().forEach(function(contents) {
+      const spans = contents.document.querySelectorAll("span[data-char-name]");
+      spans.forEach(function(span) {
+        const name = span.dataset.charName;
+        const color = characterColors[name] || null;
+        const icon = characterIcons[name] || "none";
+        applySpanStyle(span, color, currentUnderlineStyle, icon);
+      });
+    });
+  }
+  
+  showToast(currentUnderlineStyle.charAt(0).toUpperCase() + currentUnderlineStyle.slice(1) + " style applied");
+});
+
+// Variable to track current underline style
+let currentUnderlineStyle = "underline";
+
+function getActiveStyle(name) {
+  // Use character-specific style if set, otherwise use global underline style
+  return characterStyles[name] || currentUnderlineStyle;
+}

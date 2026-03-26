@@ -35,8 +35,11 @@
   <!-- All Highlights button in top left -->
   <button id="allHighlightsBtn" class="home-dark-toggle" title="View all highlights" style="left: 20px; right: auto;">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 20h9"></path>
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
     </svg>
   </button>
   
@@ -90,6 +93,15 @@
       </button>
       <!-- Highlights button -->
       <button id="readerHighlightsBtn" class="top-btn" title="View all highlights">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+      </button>
+      <!-- Underline style toggle button -->
+      <button id="underlineStyleBtn" class="top-btn" title="Toggle underline style">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20h9"></path>
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
@@ -158,7 +170,7 @@
       <h2>Settings</h2>
 
       <section>
-        <h3>Appearance</h3>
+        <h3>Display</h3>
         <button id="darkModeBtn">
           <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
           <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -167,15 +179,14 @@
       </section>
 
       <section>
-        <h3>Font</h3>
-        <select id="fontSelect" class="font-select">
-          <option value="default">Default (Serif)</option>
-          <option value="literata">Literata</option>
-          <option value="merriweather">Merriweather</option>
-          <option value="lora">Lora</option>
-          <option value="atkinson">Atkinson Hyperlegible</option>
-          <option value="opendyslexic">OpenDyslexic</option>
-        </select>
+        <h3>Character Colour</h3>
+        <p class="settings-hint">Tap a character name in the text, or pick one from the list on the left.</p>
+        <div id="settingsColorPalette"></div>
+        <div id="settingsCustomColorRow">
+          <label>Custom:</label>
+          <input type="color" id="colorPicker" value="#ff0000">
+        </div>
+        <button id="saveColor">Apply Colour</button>
       </section>
 
       <section>
@@ -189,14 +200,15 @@
       </section>
 
       <section>
-        <h3>Character Colour</h3>
-        <p class="settings-hint">Tap a character name in the text, or pick one from the list on the left.</p>
-        <div id="settingsColorPalette"></div>
-        <div id="settingsCustomColorRow">
-          <label>Custom:</label>
-          <input type="color" id="colorPicker" value="#ff0000">
-        </div>
-        <button id="saveColor">Apply Colour</button>
+        <h3>Font</h3>
+        <select id="fontSelect" class="font-select">
+          <option value="default">Default (Serif)</option>
+          <option value="literata">Literata</option>
+          <option value="merriweather">Merriweather</option>
+          <option value="lora">Lora</option>
+          <option value="atkinson">Atkinson Hyperlegible</option>
+          <option value="opendyslexic">OpenDyslexic</option>
+        </select>
       </section>
 
     </div>
@@ -225,6 +237,7 @@
     <label><input type="radio" name="inlineIcon" value="dot"> ● Dot</label>
     <label><input type="radio" name="inlineIcon" value="triangle"> ▲ Triangle</label>
     <label><input type="radio" name="inlineIcon" value="diamond"> ◆ Diamond</label>
+    <label><input type="radio" name="inlineIcon" value="pencil"> ✏️ Pencil</label>
   </div>
   <br>
   <div class="picker-actions">
@@ -263,7 +276,10 @@
   <meta name="theme-color" content="#2c2015">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StoryLens">
   <link rel="apple-touch-icon" href="logo-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="logo-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="logo-512.png">
 
 <script src="app.js"></script>
 
