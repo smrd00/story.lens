@@ -87,22 +87,31 @@ const HL_STORE_NAME = "highlights"; // Store for highlights
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = function(e) {
-      const db = e.target.result;
-      // Create books store if it doesn't exist (for existing users)
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
-        store.createIndex("name", "name", { unique: false });
+    try {
+      if (!window.indexedDB) {
+        reject(new Error("IndexedDB is not supported in this browser"));
+        return;
       }
-      // Create highlights store if it doesn't exist
-      if (!db.objectStoreNames.contains(HL_STORE_NAME)) {
-        const hlStore = db.createObjectStore(HL_STORE_NAME, { keyPath: "id", autoIncrement: true });
-        hlStore.createIndex("bookName", "bookName", { unique: false });
-      }
-    };
-    req.onsuccess  = e => resolve(e.target.result);
-    req.onerror    = e => reject(e.target.error);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function(e) {
+        const db = e.target.result;
+        // Create books store if it doesn't exist (for existing users)
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          const store = db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+          store.createIndex("name", "name", { unique: false });
+        }
+        // Create highlights store if it doesn't exist
+        if (!db.objectStoreNames.contains(HL_STORE_NAME)) {
+          const hlStore = db.createObjectStore(HL_STORE_NAME, { keyPath: "id", autoIncrement: true });
+          hlStore.createIndex("bookName", "bookName", { unique: false });
+        }
+      };
+      req.onsuccess  = e => resolve(e.target.result);
+      req.onerror    = e => reject(e.target.error);
+      req.onblocked  = e => reject(new Error("Database blocked - please close other tabs using this app"));
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 

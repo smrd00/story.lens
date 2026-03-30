@@ -1031,123 +1031,124 @@ body.dark .font-select {
 /* ============================================================
    INLINE COLOR PICKER
    ============================================================ */
- #inlineColorPicker {
-   display: none;
-   position: fixed;
-   background: var(--bg-popup);
-   border: 1px solid var(--border);
-   border-radius: 24px;
-   padding: 22px 24px 20px;
-   box-shadow: var(--shadow-popup);
-   z-index: 9999;
-   text-align: left;
-   min-width: 260px;
-   cursor: move;
-   user-select: none;
- }
- 
- #inlineColorPicker:active {
-   cursor: grabbing;
- }
+#inlineColorPicker {
+  display: none;
+  position: fixed;
+  background: var(--bg-popup);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 22px 24px 20px;
+  box-shadow: var(--shadow-popup);
+  z-index: 9999;
+  text-align: left;
+  min-width: 260px;
+  cursor: move;
+  user-select: none;
+}
 
- #inlineCharName {
-   font-size: 1.05em;
-   color: var(--text);
- }
+#inlineColorPicker:active {
+  cursor: grabbing;
+}
 
- /* Pastel color palette - rounded swatches */
- #colorPalette {
-   display: grid;
-   grid-template-columns: repeat(6, 1fr);
-   gap: 10px;
-   margin: 14px 0;
- }
- 
- .color-swatch {
-   width: 36px;
-   height: 36px;
-   border-radius: 50%;
-   border: 2px solid transparent;
-   cursor: pointer;
-   transition: transform 0.15s, border-color 0.15s;
-   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
- }
- .color-swatch:hover {
-   transform: scale(1.1);
- }
- .color-swatch.selected {
-   border-color: var(--accent);
-   transform: scale(1.15);
- }
+#inlineCharName {
+  font-size: 1.05em;
+  color: var(--text);
+}
 
- /* Custom color input */
- #customColorRow {
-   display: flex;
-   align-items: center;
-   gap: 10px;
-   margin-top: 12px;
-   padding-top: 12px;
-   border-top: 1px solid var(--border-light);
- }
-  #customColorRow label {
-    font-size: 0.85em;
-    color: var(--text-muted);
-  }
+/* Pastel color palette - rounded swatches */
+#colorPalette {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
 
-  /* ============================================================
-     HIGHLIGHT/UNDERLINE TOOLBAR
-     ============================================================ */
-  #hlToolbar {
-    position: fixed;
-    background: var(--bg-popup);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 8px 12px;
-    box-shadow: var(--shadow-popup);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    user-select: none;
-    -webkit-user-select: none;
-  }
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
-  .hl-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
-    background: #FFEB3B;
-    color: #000;
-    font-size: 0.85em;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
-    font-family: inherit;
-    font-weight: 600;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  .hl-btn:hover {
-    background: #FDD835;
-    transform: translateY(-1px);
-  }
-  .hl-btn:hover {
-    background: var(--bg-chip-hover);
-    transform: translateY(-1px);
-  }
-  .hl-btn:active {
-    transform: translateY(0);
-  }
+.color-swatch:hover {
+  transform: scale(1.1);
+}
 
-  .hl-color-row {
-    display: flex;
-    gap: 6px;
-    justify-content: center;
-    padding-top: 8px;
-    border-top: 1px solid var(--border-light);
-  }
+.color-swatch.selected {
+  border-color: var(--accent);
+  transform: scale(1.15);
+}
+
+/* Custom color input */
+#customColorRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+#customColorRow label {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   HIGHLIGHT/UNDERLINE TOOLBAR
+   ============================================================ */
+#hlToolbar {
+  position: fixed;
+  background: var(--bg-popup);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow-popup);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #FFEB3B;
+  color: #000;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  font-family: inherit;
+  font-weight: 600;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hl-btn:hover {
+  background: var(--bg-chip-hover);
+  transform: translateY(-1px);
+}
+
+.hl-btn:active {
+  transform: translateY(0);
+}
+
+.hl-color-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
 
   .hl-color-swatch {
     width: 24px;

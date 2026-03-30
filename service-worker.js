@@ -1,5 +1,5 @@
 // StoryLens Service Worker
-const CACHE_NAME = 'storylens-v3';
+const CACHE_NAME = 'storylens-v4';
 const urlsToCache = [
   './index.html',
   './style.css',
@@ -7,12 +7,15 @@ const urlsToCache = [
   './manifest.json',
   './logo-192.png',
   './logo-512.png',
+  './logo.svg',
   './fonts/OpenDyslexic/OpenDyslexic-Regular.otf',
   './fonts/OpenDyslexic/OpenDyslexic-Bold.otf',
   './fonts/OpenDyslexic/OpenDyslexic-Italic.otf',
   './fonts/OpenDyslexic/OpenDyslexic-BoldItalic.otf',
   './fonts/OpenDyslexic/OpenDyslexicAlta-Regular.otf',
   './fonts/OpenDyslexic/OpenDyslexicAlta-Bold.otf',
+  './fonts/OpenDyslexic/OpenDyslexicAlta-Italic.otf',
+  './fonts/OpenDyslexic/OpenDyslexicAlta-BoldItalic.otf',
   './fonts/OpenDyslexic/OpenDyslexicMono-Regular.otf'
 ];
 
