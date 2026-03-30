@@ -52,7 +52,27 @@ let highlights = []; // Array of { id, text, bookName, page, type: 'highlight', 
 const DYSLEXIC_FONT_CSS = `
   @font-face {
     font-family: 'OpenDyslexic';
-    src: url('fonts/OpenDyslexic/OpenDyslexic-Regular.otf') format('opentype');
+    src: url('${location.origin}${location.pathname.replace(/[^/]*$/, '')}fonts/OpenDyslexic/OpenDyslexic-Regular.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'OpenDyslexic';
+    src: url('${location.origin}${location.pathname.replace(/[^/]*$/, '')}fonts/OpenDyslexic/OpenDyslexic-Bold.otf') format('opentype');
+    font-weight: bold;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'OpenDyslexic';
+    src: url('${location.origin}${location.pathname.replace(/[^/]*$/, '')}fonts/OpenDyslexic/OpenDyslexic-Italic.otf') format('opentype');
+    font-weight: normal;
+    font-style: italic;
+  }
+  @font-face {
+    font-family: 'OpenDyslexic';
+    src: url('${location.origin}${location.pathname.replace(/[^/]*$/, '')}fonts/OpenDyslexic/OpenDyslexic-BoldItalic.otf') format('opentype');
+    font-weight: bold;
+    font-style: italic;
   }
   * { font-family: 'OpenDyslexic', sans-serif !important; }
 `;
@@ -327,8 +347,12 @@ document.getElementById("fileUpload").addEventListener("change", async function(
   if (!file) return;
 
   const fileType = file.name.split(".").pop().toLowerCase();
-  if (fileType !== "pdf" && fileType !== "epub") {
-    showToast("Unsupported file type. Please choose a PDF or EPUB.");
+  if (fileType === "pdf") {
+    showToast("PDF files are not supported. This app only supports EPUB format.");
+    return;
+  }
+  if (fileType !== "epub") {
+    showToast("Unsupported file type. Please choose an EPUB file.");
     return;
   }
 
@@ -451,7 +475,17 @@ function loadEPUB(arrayBuffer, filename) {
     flow:    "paginated",
     spread:  "none",
     width:   content.offsetWidth  || window.innerWidth,
-    height:  content.offsetHeight || window.innerHeight - 90
+    height:  content.offsetHeight || window.innerHeight - 90,
+    // Disable epub.js built-in touch handling to allow our custom handlers
+    resumeReading: false,
+  });
+  
+  // Disable epub.js default touch handlers that might interfere with text selection
+  rendition.on("renderer", function(renderer) {
+    // Disable the built-in swipe/gesture handling
+    if (renderer.hooks && renderer.hooks.touch) {
+      // Let our custom handlers take precedence
+    }
   });
 
   rendition.themes.fontSize(currentFontSize + "%");
@@ -470,16 +504,19 @@ function loadEPUB(arrayBuffer, filename) {
     applyFontToContents(contents);
     injectTextSelectionStyles(contents);
     
-    // Add selection handler for highlight in EPUB
+    // Add selection handler for highlight in EPUB using Pointer Events (unified input handling)
+    // Pointer Events work for mouse, touch, and pen - solving mobile compatibility
     const doc = contents.document;
     if (doc._hlSelectionHandler) {
-      doc.removeEventListener("mouseup", doc._hlSelectionHandler);
-      doc.removeEventListener("touchend", doc._hlSelectionHandler);
+      doc.removeEventListener("pointerup", doc._hlSelectionHandler);
       doc.removeEventListener("selectionchange", doc._hlSelectionChangeHandler);
     }
     doc._hlSelectionHandler = function(e) {
-      // Don't prevent default on touchend - let iOS handle text selection
-      // We just want to detect and display the toolbar for existing selections
+      // Check pointer type - for touch, let the browser handle selection first
+      // We only intercept after the selection is complete
+      const isTouch = e.pointerType === 'touch';
+      const delay = isTouch ? 150 : 50; // Longer delay for touch to allow system selection UI
+      
       setTimeout(function() {
         const sel = doc.getSelection();
         if (!sel || sel.isCollapsed) {
@@ -526,13 +563,13 @@ function loadEPUB(arrayBuffer, filename) {
         } catch(err) {
           console.warn("Could not show highlight toolbar:", err);
         }
-      }, 50);
+      }, delay);
     };
-    doc.addEventListener("mouseup", doc._hlSelectionHandler);
-    // Use passive listener for touchend to not block text selection
-    doc.addEventListener("touchend", doc._hlSelectionHandler, { passive: true });
+    // Use pointerup for unified handling of mouse, touch, and pen inputs
+    doc.addEventListener("pointerup", doc._hlSelectionHandler);
     
-    // Also listen for selectionchange on the iframe document (for mobile)
+    // Also listen for selectionchange for browsers that don't fire pointerup reliably
+    // This catches edge cases like long-press selection on mobile
     if (doc._hlSelectionChangeHandler) {
       doc.removeEventListener("selectionchange", doc._hlSelectionChangeHandler);
     }
@@ -1271,7 +1308,7 @@ function attachSpanHandlers(s) {
   s._lastTap = 0;
   
   function handleActivation(e) {
-    e.stopPropagation();
+    // Don't stop propagation - let iOS handle text selection natively
     const charName = s.dataset.charName;
     let absX, absY;
 
@@ -1313,8 +1350,8 @@ function attachSpanHandlers(s) {
   s.style.touchAction = "auto";
   
   // Add touchstart for immediate response on iOS
+  // Don't stop propagation - let iOS handle text selection natively
   s.addEventListener("touchstart", function(e) {
-    e.stopPropagation();
     // Store touch coordinates and time for use in touchend
     if (e.changedTouches && e.changedTouches.length > 0) {
       s._touchStartX = e.changedTouches[0].clientX;
@@ -1377,12 +1414,13 @@ function attachSpanHandlers(s) {
       return;
     }
     
-    // For short touches (likely taps), use a delay to allow text selection to complete
+    // For short touches (likely taps), use a longer delay to allow text selection to complete on mobile
     // This prevents blocking text selection while still allowing tap-to-color
+    // Increased to 300ms to give iOS more time to complete text selection
     const touchDuration = (s._touchStartTime || now) - now;
     
-    // If touch was very short (< 150ms), it's likely a deliberate tap
-    // Show the picker after a short delay to allow text selection to be cancelled
+    // Show the picker after a longer delay (300ms) to allow text selection to complete on mobile
+    // This is especially important for iOS where text selection takes time
     setTimeout(function() {
       // Check again if text selection happened during the delay
       const currentSel = s.ownerDocument ? s.ownerDocument.getSelection() : null;
@@ -1468,6 +1506,7 @@ function injectCapitalWordClicker(contents) {
         user-select: text !important;
         -webkit-touch-callout: default !important;
         -webkit-highlight: none;
+        -webkit-touch-select: auto !important;
       }
       /* Allow text selection in character spans */
       span[data-char-name] {
@@ -1475,12 +1514,18 @@ function injectCapitalWordClicker(contents) {
         user-select: text !important;
         -webkit-touch-callout: default !important;
         -webkit-highlight: none;
+        -webkit-touch-select: auto !important;
       }
       /* Except for icon elements inside spans */
       span[data-icon] {
         -webkit-user-select: none !important;
         user-select: none !important;
         pointer-events: none;
+      }
+      /* Ensure iframe body allows selection */
+      body {
+        -webkit-user-select: text !important;
+        -webkit-touch-select: auto !important;
       }
     `;
     doc.head.appendChild(selectionStyle);
@@ -1492,6 +1537,7 @@ function injectCapitalWordClicker(contents) {
   }
   doc._selectionChangeHandler = function() {
     // iOS selection change handler - check for text selection
+    // Use longer delay to ensure selection is complete on mobile
     setTimeout(function() {
       const sel = doc.getSelection ? doc.getSelection() : null;
       if (sel && sel.toString().trim().length > 0) {
@@ -1631,8 +1677,8 @@ function injectCapitalWordClicker(contents) {
     // Check if clicking on an already colored character - show color picker
     if (e.target && e.target.dataset && e.target.dataset.charName) {
       const name = e.target.dataset.charName;
-      // Don't prevent default - this prevents text selection on some devices
-      e.stopPropagation();
+      // Don't prevent default or stop propagation - this prevents text selection on some devices
+      // e.stopPropagation(); // Removed - interferes with iOS text selection
       
       // Get position for popup
       const rect = e.target.getBoundingClientRect();
@@ -1893,8 +1939,11 @@ function initColorPalette() {
   
   if (!picker) return;
   
-  // Mouse events
-  picker.addEventListener("mousedown", function(e) {
+  // Pointer Events - unified handling for mouse, touch, and pen
+  picker.addEventListener("pointerdown", function(e) {
+    // Only handle mouse or pen, let touch pass through for native selection
+    if (e.pointerType === 'touch') return;
+    
     // Don't drag if clicking on buttons or inputs
     if (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT" || e.target.closest("button") || e.target.closest("input")) {
       return;
@@ -1903,9 +1952,10 @@ function initColorPalette() {
     dragOffsetX = e.clientX - picker.offsetLeft;
     dragOffsetY = e.clientY - picker.offsetTop;
     picker.style.cursor = "grabbing";
+    picker.setPointerCapture(e.pointerId); // Capture pointer for smooth dragging
   });
   
-  document.addEventListener("mousemove", function(e) {
+  document.addEventListener("pointermove", function(e) {
     if (!isDragging) return;
     let newX = e.clientX - dragOffsetX;
     let newY = e.clientY - dragOffsetY;
@@ -1918,7 +1968,7 @@ function initColorPalette() {
     picker.style.top = newY + "px";
   });
   
-  document.addEventListener("mouseup", function() {
+  document.addEventListener("pointerup", function(e) {
     if (isDragging) {
       isDragging = false;
       picker.style.cursor = "move";

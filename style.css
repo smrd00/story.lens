@@ -497,9 +497,9 @@ body.dark .icon-moon {
   height: 100dvh;
   background: var(--bg);
   overflow: hidden;
-  border-radius: 20px;
-  margin: 8px;
-  max-width: calc(100vw - 16px);
+  border-radius: 0;
+  margin: 0;
+  max-width: 100vw;
 }
 
 /* On mobile, remove the rounded corners and margin */
@@ -1440,6 +1440,7 @@ body {
 }
 
 /* Reader content area - allow text selection */
+/* Uses pan-y to allow vertical scrolling while enabling text selection */
 #reader {
   -webkit-user-select: text !important;
   user-select: text !important;
@@ -1459,4 +1460,46 @@ body {
   -webkit-user-select: text !important;
   user-select: text !important;
   touch-action: pan-y !important;
+  -webkit-touch-select: auto !important;
+}
+
+/* Ensure iframe body allows touch text selection on iOS */
+#reader #epubViewer iframe body,
+#epubViewer .epub-container body {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-select: auto !important;
+  -webkit-touch-callout: default !important;
+}
+
+/* Ensure iframe itself allows touch selection */
+#reader #epubViewer > iframe,
+#epubViewer > iframe {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-select: auto !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure ALL elements inside EPUB can receive touch events */
+#epubViewer * {
+  pointer-events: auto !important;
+  -webkit-pointer-events: auto !important;
+  touch-action: auto !important;
+  -webkit-touch-callout: default !important;
+}
+
+/* epub-container should allow touch events */
+#epubViewer .epub-container {
+  pointer-events: auto !important;
+  touch-action: auto !important;
+}
+
+/* Ensure body inside iframe allows touch */
+#epubViewer .epub-container {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-select: auto !important;
+  -webkit-touch-callout: default !important;
+  pointer-events: auto !important;
 }

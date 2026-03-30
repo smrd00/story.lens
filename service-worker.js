@@ -1,5 +1,5 @@
 // StoryLens Service Worker
-const CACHE_NAME = 'storylens-v2';
+const CACHE_NAME = 'storylens-v3';
 const urlsToCache = [
   './index.html',
   './style.css',
