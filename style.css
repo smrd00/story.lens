@@ -723,6 +723,107 @@ body.dark .nav-arrow { color: var(--text-bar); }
   pointer-events: none;
 }
 
+/* Mode toggle buttons */
+.mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.mode-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.mode-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+}
+
+.mode-btn:active {
+  transform: scale(0.95);
+}
+
+.mode-btn.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(139, 90, 43, 0.3);
+}
+
+body.dark .mode-btn {
+  background: var(--bg-card);
+  color: var(--text-muted);
+}
+
+body.dark .mode-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+}
+
+body.dark .mode-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* Character mode - visible indicators on character spans */
+body.mode-character span[data-char-name] {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+body.mode-character span[data-char-name]::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: currentColor;
+  opacity: 0.5;
+  border-radius: 2px;
+}
+
+body.mode-character span[data-char-name]:hover::after {
+  opacity: 0.8;
+}
+
+/* Normal mode - disable all interaction */
+body.mode-normal {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+body.mode-normal * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+body.mode-normal span[data-char-name] {
+  pointer-events: none !important;
+  cursor: default;
+}
+
+/* Highlight mode - enable text selection */
+body.mode-highlight {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+body.mode-highlight * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
 /* Progress section in bottom bar */
 .progress-section {
   flex: 1;

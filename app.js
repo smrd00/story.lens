@@ -39,6 +39,11 @@ let currentPage   = 1;
 let totalPages    = 0;
 let rendition     = null;
 let currentBookName = "";
+// Shared touch event variables for swipe navigation
+let touchStartX = 0;
+let touchStartY = 0;
+let tapTimeout = null;
+let hasSwiped = false;
 let currentBookType = "";  // "pdf" | "epub"
 let detectedCharacters = {};
 let characterColors    = {};
@@ -48,6 +53,106 @@ let characterIcons     = {}; // per-character icon: "none" | "star" | "dot" | "t
 
 // Highlights storage (per book)
 let highlights = []; // Array of { id, text, bookName, page, type: 'highlight', color, date }
+
+// Interaction modes for touch compatibility
+// "normal" - swipe navigation only, no text selection or character interaction
+// "highlight" - text selection for highlighting
+// "character" - tap characters to select them, show color picker
+let currentInteractionMode = "normal"; // Default to normal mode for mobile compatibility
+
+function setInteractionMode(mode) {
+  currentInteractionMode = mode;
+  
+  // Update body class for CSS-based styling
+  document.body.classList.remove('mode-normal', 'mode-highlight', 'mode-character');
+  document.body.classList.add('mode-' + mode);
+  
+  // Update button states
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  
+  // Update iframe content styles for EPUB
+  updateIframeModeStyles();
+  
+  // Show toast notification
+  const modeNames = { normal: "Normal", highlight: "Highlight", character: "Character" };
+  showToast(modeNames[mode] + " mode activated");
+}
+
+function updateIframeModeStyles() {
+  if (!rendition) return;
+  
+  let modeCSS = '';
+  
+  if (currentInteractionMode === 'normal') {
+    // Disable all text selection and character interaction
+    modeCSS = `
+      * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        pointer-events: auto !important;
+      }
+      span[data-char-name] {
+        pointer-events: none !important;
+        cursor: default !important;
+      }
+    `;
+  } else if (currentInteractionMode === 'highlight') {
+    // Enable text selection for highlighting
+    modeCSS = `
+      * {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+      }
+      span[data-char-name] {
+        -webkit-user-select: text !important;
+        pointer-events: auto !important;
+      }
+    `;
+  } else if (currentInteractionMode === 'character') {
+    // Disable text selection, but enable character span interaction with visual indicator
+    modeCSS = `
+      * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+      }
+      span[data-char-name] {
+        -webkit-user-select: none !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
+        position: relative !important;
+      }
+      span[data-char-name]::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: currentColor;
+        opacity: 0.5;
+        border-radius: 2px;
+        pointer-events: none;
+      }
+      span[data-char-name]:hover::after,
+      span[data-char-name]:active::after {
+        opacity: 0.9;
+      }
+    `;
+  }
+  
+  rendition.getContents().forEach(function(contents) {
+    const doc = contents.document;
+    let styleEl = doc.getElementById('mode-override-styles');
+    if (!styleEl) {
+      styleEl = doc.createElement('style');
+      styleEl.id = 'mode-override-styles';
+      doc.head.appendChild(styleEl);
+    }
+    styleEl.textContent = modeCSS;
+  });
+}
 
 const DYSLEXIC_FONT_CSS = `
   @font-face {
@@ -503,6 +608,42 @@ function loadEPUB(arrayBuffer, filename) {
   rendition.display(savedCfi || undefined);
 
   rendition.hooks.content.register(function(contents) {
+    // Add swipe navigation handlers to iframe content for touch devices
+    const doc = contents.document;
+    const iframe = document.getElementById("epubViewer").querySelector("iframe");
+    
+    if (iframe) {
+      doc.addEventListener("touchstart", function(e) {
+        touchStartX = e.changedTouches[0].clientX;
+        touchStartY = e.changedTouches[0].clientY;
+        hasSwiped = false;
+        clearTimeout(tapTimeout);
+      }, { passive: true });
+      
+      doc.addEventListener("touchmove", function(e) {
+        const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
+        const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+        if (dx > 30 || dy > 30) {
+          hasSwiped = true;
+          clearTimeout(tapTimeout);
+        }
+      }, { passive: true });
+      
+      doc.addEventListener("touchend", function(e) {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        
+        // Horizontal swipe for page navigation
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          if (dx < 0) {
+            nextPage(); // swipe left → next
+          } else {
+            prevPage(); // swipe right → prev
+          }
+        }
+      }, { passive: true });
+    }
+    
     const text = contents.document.body.innerText;
     detectCharacters(text);
     updateCharacterList();
@@ -512,6 +653,9 @@ function loadEPUB(arrayBuffer, filename) {
     injectCapitalWordClicker(contents);
     applyFontToContents(contents);
     injectTextSelectionStyles(contents);
+    
+    // Apply current interaction mode styles to iframe content
+    updateIframeModeStyles();
     
     // Add selection handler for highlight in EPUB using Pointer Events (unified input handling)
     // Pointer Events work for mouse, touch, and pen - solving mobile compatibility
@@ -527,6 +671,13 @@ function loadEPUB(arrayBuffer, filename) {
       const delay = isTouch ? 150 : 50; // Longer delay for touch to allow system selection UI
       
       setTimeout(function() {
+        // In Normal or Character mode, don't show highlight toolbar
+        if (currentInteractionMode !== "highlight") {
+          const toolbar = document.getElementById("hlToolbar");
+          if (toolbar) toolbar.style.display = "none";
+          return;
+        }
+        
         const sel = doc.getSelection();
         if (!sel || sel.isCollapsed) {
           const toolbar = document.getElementById("hlToolbar");
@@ -592,6 +743,11 @@ function loadEPUB(arrayBuffer, filename) {
       doc.removeEventListener("click", doc._hlClickHandler);
     }
     doc._hlClickHandler = function(e) {
+      // In Normal or Character mode, don't show highlight manage popup
+      if (currentInteractionMode !== "highlight") {
+        return;
+      }
+      
       // Check if clicking on a highlighted span
       const isHighlight = e.target && e.target.classList && e.target.classList.contains("user-highlight");
       
@@ -797,6 +953,22 @@ function prevPage() {
 document.getElementById("nextBtn").addEventListener("click", nextPage);
 document.getElementById("prevBtn").addEventListener("click", prevPage);
 
+// Mode toggle event listeners
+document.getElementById("modeNormal").addEventListener("click", function() {
+  setInteractionMode("normal");
+});
+
+document.getElementById("modeHighlight").addEventListener("click", function() {
+  setInteractionMode("highlight");
+});
+
+document.getElementById("modeCharacter").addEventListener("click", function() {
+  setInteractionMode("character");
+});
+
+// Initialize with normal mode (swipe only)
+setInteractionMode("normal");
+
 window.addEventListener("resize", function() {
   if (rendition) {
     const content = document.getElementById("readingContent");
@@ -808,10 +980,6 @@ window.addEventListener("resize", function() {
 //  SWIPE NAVIGATION & TAP TO TOGGLE (touch devices)
 // ============================================================
 (function() {
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let tapTimeout = null;
-  let hasSwiped = false;
   let isOnContent = false;
   
   const readingArea = document.getElementById("readingArea");
@@ -1675,36 +1843,48 @@ function injectCapitalWordClicker(contents) {
   if (doc._capitalTapHandler) {
     doc.removeEventListener("click", doc._capitalTapHandler);
   }
-  doc._capitalTapHandler = function(e) {
-    // Check if there's an active text selection - don't interfere
-    const sel = doc.getSelection ? doc.getSelection() : null;
-    if (sel && sel.toString().trim().length > 0) {
-      // There's a selection - let it be, don't show color picker
-      return;
-    }
-    
-    // Check if clicking on an already colored character - show color picker
-    if (e.target && e.target.dataset && e.target.dataset.charName) {
-      const name = e.target.dataset.charName;
-      // Don't prevent default or stop propagation - this prevents text selection on some devices
-      // e.stopPropagation(); // Removed - interferes with iOS text selection
-      
-      // Get position for popup
-      const rect = e.target.getBoundingClientRect();
-      const iframe = document.getElementById("epubViewer").querySelector("iframe");
-      let iframeX = 0, iframeY = 0;
-      if (iframe) {
-        const ifRect = iframe.getBoundingClientRect();
-        iframeX = ifRect.left;
-        iframeY = ifRect.top;
-      }
-      
-      // Show the inline color picker for this character
-      openInlineColorPicker(name, rect.left + iframeX, rect.bottom + iframeY);
-      return;
-    }
-    
-    // Only handle if target is text content (not already a highlighted span)
+   doc._capitalTapHandler = function(e) {
+     // Check if there's an active text selection - don't interfere
+     const sel = doc.getSelection ? doc.getSelection() : null;
+     if (sel && sel.toString().trim().length > 0) {
+       // There's a selection - let it be, don't show color picker
+       return;
+     }
+     
+     // Check if clicking on an already colored character - show color picker
+     if (e.target && e.target.dataset && e.target.dataset.charName) {
+       const name = e.target.dataset.charName;
+       
+       // In Character mode, always show color picker on character span click
+       // In Normal mode, don't show color picker
+       // In Highlight mode, allow normal text selection behavior
+       if (currentInteractionMode === "normal") {
+         // Don't show color picker in normal mode - just allow swipe navigation
+         return;
+       }
+       
+       if (currentInteractionMode === "character") {
+         // In character mode, show color picker directly on character tap
+         const rect = e.target.getBoundingClientRect();
+         const iframe = document.getElementById("epubViewer").querySelector("iframe");
+         let iframeX = 0, iframeY = 0;
+         if (iframe) {
+           const ifRect = iframe.getBoundingClientRect();
+           iframeX = ifRect.left;
+           iframeY = ifRect.top;
+         }
+         
+         // Show the inline color picker for this character
+         openInlineColorPicker(name, rect.left + iframeX, rect.bottom + iframeY);
+         return;
+       }
+       
+       // In highlight mode, continue with normal behavior (text selection)
+       // Don't prevent default or stop propagation - this prevents text selection on some devices
+       // e.stopPropagation(); // Removed - interferes with iOS text selection
+     }
+     
+     // Only handle if target is text content (not already a highlighted span)
     if (e.target && (e.target.tagName === 'SPAN' || e.target.tagName === 'DIV')) return;
     
     // Use setTimeout to ensure selection is properly handled
@@ -1717,6 +1897,11 @@ function injectCapitalWordClicker(contents) {
 
 function handleWordInteraction(e, contents, mode) {
   const doc = contents.document;
+  
+  // In Normal mode, don't show any pickers or dialogs - just allow swipe navigation
+  if (currentInteractionMode === "normal") {
+    return;
+  }
 
   // First, check if there is a user text selection (for highlighting/underlining)
   const sel = doc.getSelection ? doc.getSelection() : null;
