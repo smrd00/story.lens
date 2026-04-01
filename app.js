@@ -99,15 +99,27 @@ function updateIframeModeStyles() {
       }
     `;
   } else if (currentInteractionMode === 'highlight') {
-    // Enable text selection for highlighting
+    // Enable text selection for highlighting with full mobile support
     modeCSS = `
       * {
         -webkit-user-select: text !important;
         user-select: text !important;
+        -webkit-touch-callout: default !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      html, body {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
+        touch-action: pan-y !important;
       }
       span[data-char-name] {
         -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
         pointer-events: auto !important;
+        cursor: text !important;
+        touch-action: auto !important;
       }
     `;
   } else if (currentInteractionMode === 'character') {
@@ -659,7 +671,6 @@ function loadEPUB(arrayBuffer, filename) {
     
     // Add selection handler for highlight in EPUB using Pointer Events (unified input handling)
     // Pointer Events work for mouse, touch, and pen - solving mobile compatibility
-    const doc = contents.document;
     if (doc._hlSelectionHandler) {
       doc.removeEventListener("pointerup", doc._hlSelectionHandler);
       doc.removeEventListener("selectionchange", doc._hlSelectionChangeHandler);
@@ -1088,33 +1099,11 @@ function injectTextSelectionStyles(contents) {
   const old = contents.document.getElementById("sl-touch-select-style");
   if (old) old.remove();
 
-  // Inject styles to enable text selection on touch devices
+  // Inject base styles to enable text selection on touch devices
+  // These will be overridden by mode-specific styles
   const style = contents.document.createElement("style");
   style.id = "sl-touch-select-style";
   style.textContent = `
-    * {
-      -webkit-user-select: text !important;
-      user-select: text !important;
-      -webkit-touch-callout: default !important;
-      -webkit-touch-select: text !important;
-      touch-action: auto !important;
-      pointer-events: auto !important;
-    }
-    html, body {
-      -webkit-user-select: text !important;
-      user-select: text !important;
-      -webkit-touch-callout: default !important;
-      touch-action: pan-y !important;
-    }
-    span[data-char-name] {
-      -webkit-user-select: text !important;
-      user-select: text !important;
-      -webkit-touch-callout: default !important;
-      -webkit-touch-select: text !important;
-      touch-action: auto !important;
-      pointer-events: auto !important;
-      cursor: text !important;
-    }
     ::selection {
       background: rgba(90, 62, 40, 0.3) !important;
     }
@@ -1485,14 +1474,24 @@ function attachSpanHandlers(s) {
   s._lastTap = 0;
   
   function handleActivation(e) {
+    // Get current interaction mode from parent window
+    const currentMode = (window.parent && window.parent.currentInteractionMode)
+      ? window.parent.currentInteractionMode
+      : "normal";
+    
+    // Only handle character interactions in character mode
+    if (currentMode !== "character") {
+      return;
+    }
+    
     // Don't stop propagation - let iOS handle text selection natively
     const charName = s.dataset.charName;
     let absX, absY;
 
     // Handle touch events first (for iOS)
     if (e.type === "touchstart" || e.type === "touchend") {
-      const touch = e.changedTouches && e.changedTouches.length > 0 
-        ? e.changedTouches[0] 
+      const touch = e.changedTouches && e.changedTouches.length > 0
+        ? e.changedTouches[0]
         : (e.touches && e.touches.length > 0 ? e.touches[0] : null);
       if (touch) {
         absX = touch.clientX;
@@ -1513,7 +1512,7 @@ function attachSpanHandlers(s) {
           const rect = iframe.getBoundingClientRect();
           absX += rect.left;
           absY += rect.top;
-        }
+          }
       });
     } catch(err) {}
 
@@ -1538,6 +1537,27 @@ function attachSpanHandlers(s) {
   }, { passive: true });
   
   s.addEventListener("touchend", function(e) {
+    // Get current interaction mode from parent window
+    const currentMode = (window.parent && window.parent.currentInteractionMode)
+      ? window.parent.currentInteractionMode
+      : "normal";
+    
+    // In normal mode, don't handle character interactions at all
+    if (currentMode === "normal") {
+      return;
+    }
+    
+    // In highlight mode, allow text selection without interference
+    if (currentMode === "highlight") {
+      // Don't interfere with text selection
+      return;
+    }
+    
+    // Only handle character interactions in character mode
+    if (currentMode !== "character") {
+      return;
+    }
+    
     // Check for double-tap to select text
     const now = Date.now();
     const timeDiff = now - (s._lastTap || 0);
