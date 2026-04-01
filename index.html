@@ -7,7 +7,7 @@
 <title>StoryLens</title>
 
 <link rel="stylesheet" href="style.css">
-<link rel="icon" type="image/png" href="logo.png">
+<link rel="icon" type="image/png" href="logo/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Coda:wght@400;700&family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
@@ -46,7 +46,7 @@
   <div id="homeHero">
     <div id="homeLogo">
       
-      <img src="logo.svg" alt="StoryLens logo" width="140" height="110" id="customLogo" onerror="this.style.display='none'">
+      <img src="logo/logo.svg" alt="StoryLens logo" width="140" height="110" id="customLogo" onerror="this.style.display='none'">
     </div>
     <h1>StoryLens</h1>
     <p id="homeSubtitle">Your personal reading companion.<br>Track characters, adjust fonts, and read comfortably.
@@ -115,6 +115,11 @@
 
     <!-- Bottom bar: progress + navigation arrows + amount read -->
     <div class="bottom-bar" id="bottomBar">
+      <!-- Navigation arrows on sides -->
+      <button id="prevBtn" class="nav-arrow nav-prev" title="Previous page">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      
       <div class="progress-section">
         <!-- Mode toggle buttons -->
         <div class="mode-toggle" id="modeToggle">
@@ -144,6 +149,10 @@
         </div>
         <span id="pageInfo">—</span>
       </div>
+      
+      <button id="nextBtn" class="nav-arrow nav-next" title="Next page">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
     </div>
 
   </div>
