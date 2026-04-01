@@ -63,6 +63,9 @@ let currentInteractionMode = "normal"; // Default to normal mode for mobile comp
 function setInteractionMode(mode) {
   currentInteractionMode = mode;
   
+  // Make mode accessible to iframe content
+  window.currentInteractionMode = mode;
+  
   // Update body class for CSS-based styling
   document.body.classList.remove('mode-normal', 'mode-highlight', 'mode-character');
   document.body.classList.add('mode-' + mode);
@@ -86,16 +89,21 @@ function updateIframeModeStyles() {
   let modeCSS = '';
   
   if (currentInteractionMode === 'normal') {
-    // Disable all text selection and character interaction
+    // Disable all text selection and character interaction, but allow touch gestures
     modeCSS = `
       * {
         -webkit-user-select: none !important;
         user-select: none !important;
         pointer-events: auto !important;
+        touch-action: pan-x pan-y !important;
+      }
+      html, body {
+        touch-action: pan-x pan-y !important;
       }
       span[data-char-name] {
         pointer-events: none !important;
         cursor: default !important;
+        touch-action: pan-x pan-y !important;
       }
     `;
   } else if (currentInteractionMode === 'highlight') {
