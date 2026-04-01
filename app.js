@@ -95,15 +95,14 @@ function updateIframeModeStyles() {
         -webkit-user-select: none !important;
         user-select: none !important;
         pointer-events: auto !important;
-        touch-action: pan-x pan-y !important;
       }
       html, body {
-        touch-action: pan-x pan-y !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
       }
       span[data-char-name] {
         pointer-events: none !important;
         cursor: default !important;
-        touch-action: pan-x pan-y !important;
       }
     `;
   } else if (currentInteractionMode === 'highlight') {
@@ -655,13 +654,14 @@ function loadEPUB(arrayBuffer, filename) {
         
         // Horizontal swipe for page navigation
         if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          e.preventDefault(); // Prevent any default behavior
           if (dx < 0) {
             nextPage(); // swipe left → next
           } else {
             prevPage(); // swipe right → prev
           }
         }
-      }, { passive: true });
+      }, { passive: false });
     }
     
     const text = contents.document.body.innerText;
