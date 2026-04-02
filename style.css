@@ -854,6 +854,8 @@ body.mode-highlight * {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
 /* Ensure epub.js iframe and container are properly sized */
@@ -862,6 +864,8 @@ body.mode-highlight * {
   height: 100% !important;
   border: none !important;
   display: block !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
 /* epub-container inside the iframe needs explicit sizing */
@@ -870,6 +874,8 @@ body.mode-highlight * {
   height: 100% !important;
   min-height: 100% !important;
   display: block !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
 /* Progress bar - now in bottom bar */
