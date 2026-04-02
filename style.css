@@ -851,6 +851,25 @@ body.mode-highlight * {
   border: none;
   background: var(--bg-card);
   display: block;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Ensure epub.js iframe and container are properly sized */
+#epubViewer iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  display: block !important;
+}
+
+/* epub-container inside the iframe needs explicit sizing */
+#epubViewer .epub-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  display: block !important;
 }
 
 /* Progress bar - now in bottom bar */
