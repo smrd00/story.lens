@@ -630,7 +630,6 @@ function loadEPUB(arrayBuffer, filename) {
 
   // Add displayed event to ensure rendering is complete
   rendition.on("displayed", function() {
-    console.log("EPUB displayed successfully");
     // Force iframe sizing after display
     const iframe = viewer.querySelector("iframe");
     if (iframe) {
@@ -716,6 +715,9 @@ function loadEPUB(arrayBuffer, filename) {
       doc.removeEventListener("selectionchange", doc._hlSelectionChangeHandler);
     }
     doc._hlSelectionHandler = function(e) {
+      // Guard against missing event object
+      if (!e) return;
+      
       // Check pointer type - for touch, let the browser handle selection first
       // We only intercept after the selection is complete
       const isTouch = e.pointerType === 'touch';
@@ -2211,6 +2213,9 @@ function initColorPalette() {
   
   // Pointer Events - unified handling for mouse, touch, and pen
   picker.addEventListener("pointerdown", function(e) {
+    // Guard against missing event object
+    if (!e) return;
+    
     // Only handle mouse or pen, let touch pass through for native selection
     if (e.pointerType === 'touch') return;
     
