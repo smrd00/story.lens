@@ -439,11 +439,14 @@ async function openBookFromDB(book) {
 
   showReader(book.name);
 
-  if (book.type === "pdf") {
-    loadPDF(book.data, book.name);
-  } else {
-    loadEPUB(book.data, book.name);
-  }
+  // Small delay to ensure reader DOM is rendered before loading content
+  requestAnimationFrame(() => {
+    if (book.type === "pdf") {
+      loadPDF(book.data, book.name);
+    } else {
+      loadEPUB(book.data, book.name);
+    }
+  });
 }
 
 function showReader(bookName) {
@@ -504,11 +507,14 @@ document.getElementById("fileUpload").addEventListener("change", async function(
   currentBookType = fileType;
   showReader(file.name);
 
-  if (fileType === "pdf") {
-    loadPDF(arrayBuffer, file.name);
-  } else {
-    loadEPUB(arrayBuffer, file.name);
-  }
+  // Small delay to ensure reader DOM is rendered before loading content
+  requestAnimationFrame(() => {
+    if (fileType === "pdf") {
+      loadPDF(arrayBuffer, file.name);
+    } else {
+      loadEPUB(arrayBuffer, file.name);
+    }
+  });
 
   // reset input so same file can be re-selected
   this.value = "";
@@ -599,19 +605,44 @@ function loadEPUB(arrayBuffer, filename) {
   document.getElementById("epubViewer").style.display = "block";
   document.getElementById("pdfCanvas").style.display  = "none";
 
+  // Clear any previous content
+  const viewer = document.getElementById("epubViewer");
+  viewer.innerHTML = '';
+
   const savedKey = "savedPage_epub_" + filename;
   const book     = ePub(arrayBuffer.slice(0)); // slice to avoid detached buffer issues
 
-  const viewer  = document.getElementById("epubViewer");
   const content = document.getElementById("readingContent");
+  
+  // Ensure we have proper dimensions
+  const viewerWidth = viewer.offsetWidth || content.offsetWidth || window.innerWidth;
+  const viewerHeight = viewer.offsetHeight || content.offsetHeight || window.innerHeight - 90;
+  
   rendition = book.renderTo("epubViewer", {
     manager: "default",
     flow:    "paginated",
     spread:  "none",
-    width:   content.offsetWidth  || window.innerWidth,
-    height:  content.offsetHeight || window.innerHeight - 90,
+    width:   viewerWidth,
+    height:  viewerHeight,
     // Disable epub.js built-in touch handling to allow our custom handlers
     resumeReading: false,
+  });
+
+  // Add displayed event to ensure rendering is complete
+  rendition.on("displayed", function() {
+    console.log("EPUB displayed successfully");
+    // Force iframe sizing after display
+    const iframe = viewer.querySelector("iframe");
+    if (iframe) {
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+    }
+  });
+
+  // Add error handling for display failures
+  rendition.on("display-error", function(error) {
+    console.error("EPUB display error:", error);
+    showToast("Error displaying book: " + error);
   });
   
   // Disable epub.js default touch handlers that might interfere with text selection
