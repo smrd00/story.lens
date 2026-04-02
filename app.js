@@ -662,34 +662,52 @@ function loadEPUB(arrayBuffer, filename) {
     const doc = contents.document;
     const iframe = document.getElementById("epubViewer").querySelector("iframe");
     
-    if (iframe) {
-      doc.addEventListener("touchstart", function(e) {
-        touchStartX = e.changedTouches[0].clientX;
-        touchStartY = e.changedTouches[0].clientY;
-        hasSwiped = false;
-        clearTimeout(tapTimeout);
+    // Also add swipe handlers on the parent reading area for better touch capture
+    const readingContent = document.getElementById("readingContent");
+    if (readingContent) {
+      readingContent.addEventListener("touchstart", function(e) {
+        if (e.target && e.target.tagName === "IFRAME") {
+          // Touch on iframe - store start position for global handler
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
       }, { passive: true });
-      
-      doc.addEventListener("touchmove", function(e) {
-        const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
-        const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
-        if (dx > 30 || dy > 30) {
-          hasSwiped = true;
+    }
+    
+    if (iframe) {
+      // Add touch event listeners to iframe document for page navigation
+      doc.addEventListener("touchstart", function(e) {
+        if (e.changedTouches && e.changedTouches.length > 0) {
+          touchStartX = e.changedTouches[0].clientX;
+          touchStartY = e.changedTouches[0].clientY;
+          hasSwiped = false;
           clearTimeout(tapTimeout);
         }
       }, { passive: true });
       
+      doc.addEventListener("touchmove", function(e) {
+        if (e.changedTouches && e.changedTouches.length > 0) {
+          const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
+          const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+          if (dx > 30 || dy > 30) {
+            hasSwiped = true;
+            clearTimeout(tapTimeout);
+          }
+        }
+      }, { passive: true });
+      
       doc.addEventListener("touchend", function(e) {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        const dy = e.changedTouches[0].clientY - touchStartY;
-        
-        // Horizontal swipe for page navigation
-        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-          e.preventDefault(); // Prevent any default behavior
-          if (dx < 0) {
-            nextPage(); // swipe left → next
-          } else {
-            prevPage(); // swipe right → prev
+        if (e.changedTouches && e.changedTouches.length > 0) {
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          const dy = e.changedTouches[0].clientY - touchStartY;
+          
+          // Horizontal swipe for page navigation
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            if (dx < 0) {
+              nextPage(); // swipe left → next
+            } else {
+              prevPage(); // swipe right → prev
+            }
           }
         }
       }, { passive: false });
@@ -1032,6 +1050,50 @@ window.addEventListener("resize", function() {
 // ============================================================
 //  SWIPE NAVIGATION & TAP TO TOGGLE (touch devices)
 // ============================================================
+// Document-level touch handlers to capture swipe from iframes
+document.addEventListener("touchstart", function(e) {
+  // Only track touches on the reader
+  const reader = document.getElementById("reader");
+  if (!reader || reader.style.display === "none") return;
+  
+  if (e.touches && e.touches.length > 0) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }
+}, { passive: true });
+
+document.addEventListener("touchmove", function(e) {
+  const reader = document.getElementById("reader");
+  if (!reader || reader.style.display === "none") return;
+  
+  if (e.touches && e.touches.length > 0) {
+    const dx = Math.abs(e.touches[0].clientX - touchStartX);
+    const dy = Math.abs(e.touches[0].clientY - touchStartY);
+    if (dx > 30 || dy > 30) {
+      hasSwiped = true;
+      clearTimeout(tapTimeout);
+    }
+  }
+}, { passive: true });
+
+document.addEventListener("touchend", function(e) {
+  const reader = document.getElementById("reader");
+  if (!reader || reader.style.display === "none") return;
+  
+  if (e.changedTouches && e.changedTouches.length > 0) {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    
+    // Check if this is a significant horizontal swipe
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) {
+        nextPage(); // swipe left → next
+      } else {
+        prevPage(); // swipe right → prev
+      }
+    }
+  }
+}, { passive: true });
 (function() {
   let isOnContent = false;
   
@@ -1047,10 +1109,13 @@ window.addEventListener("resize", function() {
     hasSwiped = false;
     clearTimeout(tapTimeout);
     
-    // Check if touch started on the content area
+    // Check if touch started on the content area (including iframe)
     const touch = e.changedTouches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    isOnContent = element && (readingContent.contains(element) || element === readingContent);
+    // Include iframe elements
+    isOnContent = element && (readingContent.contains(element) || 
+                              element === readingContent ||
+                              (element.tagName === "IFRAME"));
   }, { passive: true });
 
   readingArea.addEventListener("touchmove", function(e) {
@@ -1063,10 +1128,17 @@ window.addEventListener("resize", function() {
   }, { passive: true });
 
   readingArea.addEventListener("touchend", function(e) {
+    // Check if touch ended on iframe - handle swipe from iframe
+    const touch = e.changedTouches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const isOnIframe = element && (element.tagName === "IFRAME" || 
+                                   (element.ownerDocument && 
+                                    element.ownerDocument !== document));
+    
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
     
-    // Horizontal swipe for page navigation (works everywhere)
+    // Horizontal swipe for page navigation (works everywhere including iframe)
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       if (dx < 0) {
         nextPage(); // swipe left → next
