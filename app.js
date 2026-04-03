@@ -697,6 +697,9 @@ function loadEPUB(arrayBuffer, filename) {
       }, { passive: true });
       
       doc.addEventListener("touchend", function(e) {
+        // Only allow swipe navigation in normal mode
+        if (currentInteractionMode !== "normal") return;
+        
         if (e.changedTouches && e.changedTouches.length > 0) {
           const dx = e.changedTouches[0].clientX - touchStartX;
           const dy = e.changedTouches[0].clientY - touchStartY;
@@ -1051,10 +1054,14 @@ window.addEventListener("resize", function() {
 //  SWIPE NAVIGATION & TAP TO TOGGLE (touch devices)
 // ============================================================
 // Document-level touch handlers to capture swipe from iframes
+// Swipe is only enabled in normal mode
 document.addEventListener("touchstart", function(e) {
   // Only track touches on the reader
   const reader = document.getElementById("reader");
   if (!reader || reader.style.display === "none") return;
+  
+  // Only track for swipe in normal mode
+  if (currentInteractionMode !== "normal") return;
   
   if (e.touches && e.touches.length > 0) {
     touchStartX = e.touches[0].clientX;
@@ -1065,6 +1072,9 @@ document.addEventListener("touchstart", function(e) {
 document.addEventListener("touchmove", function(e) {
   const reader = document.getElementById("reader");
   if (!reader || reader.style.display === "none") return;
+  
+  // Only track for swipe in normal mode
+  if (currentInteractionMode !== "normal") return;
   
   if (e.touches && e.touches.length > 0) {
     const dx = Math.abs(e.touches[0].clientX - touchStartX);
@@ -1079,6 +1089,9 @@ document.addEventListener("touchmove", function(e) {
 document.addEventListener("touchend", function(e) {
   const reader = document.getElementById("reader");
   if (!reader || reader.style.display === "none") return;
+  
+  // Only allow swipe navigation in normal mode
+  if (currentInteractionMode !== "normal") return;
   
   if (e.changedTouches && e.changedTouches.length > 0) {
     const dx = e.changedTouches[0].clientX - touchStartX;
@@ -1104,6 +1117,9 @@ document.addEventListener("touchend", function(e) {
   const isMobile = window.innerWidth <= 680;
 
   readingArea.addEventListener("touchstart", function(e) {
+    // Only track touches in normal mode
+    if (currentInteractionMode !== "normal") return;
+    
     touchStartX = e.changedTouches[0].clientX;
     touchStartY = e.changedTouches[0].clientY;
     hasSwiped = false;
@@ -1119,6 +1135,9 @@ document.addEventListener("touchend", function(e) {
   }, { passive: true });
 
   readingArea.addEventListener("touchmove", function(e) {
+    // Only track touches in normal mode
+    if (currentInteractionMode !== "normal") return;
+    
     const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
     const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
     if (dx > 30 || dy > 30) {
@@ -1128,6 +1147,9 @@ document.addEventListener("touchend", function(e) {
   }, { passive: true });
 
   readingArea.addEventListener("touchend", function(e) {
+    // Only allow swipe navigation in normal mode
+    if (currentInteractionMode !== "normal") return;
+    
     // Check if touch ended on iframe - handle swipe from iframe
     const touch = e.changedTouches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
