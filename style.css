@@ -85,6 +85,36 @@ body.dark {
   --progress-track: #332b20;
 }
 
+/* Sepia mode - warm reading tone */
+body.sepia {
+  --bg:           #f4ecd8;
+  --bg-card:      #fdf6ed;
+  --bg-bar:       rgba(244,236,216,0.95);
+  --bg-sidebar:   #fdf6ed;
+  --bg-settings:  #fdf6ed;
+  --bg-popup:     #fdf6ed;
+  --bg-chip:      #e8dcc8;
+  --bg-chip-hover:#dcd0bc;
+
+  --text:         #5b4636;
+  --text-muted:   #8a7357;
+  --text-faint:   #b8a888;
+  --text-bar:     #8b5e3c;
+
+  --accent:       #8b5e3c;
+  --accent-dark:  #6d4729;
+  --accent-light: rgba(139,94,60,0.1);
+
+  --border:       #e0d4c4;
+  --border-light: #e8dcc8;
+  --shadow-card:  0 2px 10px rgba(0,0,0,0.07);
+  --shadow-popup: 0 8px 32px rgba(0,0,0,0.12);
+  --shadow-panel: -6px 0 32px rgba(0,0,0,0.12);
+
+  --progress-bg:  transparent;
+  --progress-bar: #8b5e3c;
+}
+
 /* Dark mode - ensure EPUB text is white */
 body.dark #epubViewer,
 body.dark #epubViewer iframe,
@@ -314,6 +344,12 @@ body.dark .icon-sun {
   display: block;
 }
 body.dark .icon-moon {
+  display: none;
+}
+body.sepia .icon-sun {
+  display: block;
+}
+body.sepia .icon-moon {
   display: none;
 }
 
@@ -589,7 +625,6 @@ body.dark .icon-moon {
   }
 }
 
-/* Top bar - Kindle-style */
 .top-bar {
   display: flex;
   align-items: center;
@@ -603,6 +638,22 @@ body.dark .icon-moon {
   z-index: 100;
   transition: transform 0.3s ease, opacity 0.3s ease;
   min-height: 56px;
+}
+
+/* Top progress bar - thin line below top bar */
+#topProgressBar {
+  height: 3px;
+  width: 100%;
+  background: var(--bg-chip);
+  flex-shrink: 0;
+}
+
+#topProgressFill {
+  height: 100%;
+  background: var(--progress-bar);
+  width: 0%;
+  transition: width 0.1s linear;
+  will-change: width;
 }
 
 /* Top bar hidden state for fullscreen */
@@ -664,6 +715,37 @@ body.dark .icon-moon {
   position: relative;
   min-height: 0;
   padding: 0;
+}
+
+/* Immersive reading container */
+.reader-container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+
+  /* Typography enhancements */
+  font-family: "Lexend", "Atkinson Hyperlegible", sans-serif;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  text-align: left;
+}
+
+.reader-container p {
+  margin-bottom: 1.2em;
+  line-height: inherit;
+}
+
+.reader-container h1, .reader-container h2, .reader-container h3,
+.reader-container h4, .reader-container h5, .reader-container h6 {
+  line-height: 1.3;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  letter-spacing: 0.02em;
 }
 
 #readingContent {
@@ -1168,6 +1250,7 @@ body.dark .font-select {
   z-index: 9999;
   text-align: left;
   min-width: 260px;
+  max-width: 90vw;
   cursor: move;
   user-select: none;
 }
@@ -1388,20 +1471,54 @@ body.dark .font-select {
    padding: 0;
  }
 
- #styleOptions {
-   display: flex;
-   flex-direction: column;
-   gap: 7px;
-   margin-top: 12px;
-   font-size: 0.88em;
-   color: var(--text);
- }
- #styleOptions label {
-   display: flex;
-   align-items: center;
-   gap: 7px;
-   cursor: pointer;
- }
+  #styleOptions {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 12px;
+    font-size: 0.88em;
+    color: var(--text);
+  }
+  #styleOptions label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+  }
+
+  /* Description options */
+  #descriptionOptions {
+    margin-top: 12px;
+    font-size: 0.88em;
+    color: var(--text);
+  }
+  #descriptionOptions label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  #charDescription {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9em;
+    resize: vertical;
+    min-height: 50px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  #charDescription:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+  }
+  #charDescription::placeholder {
+    color: var(--text-faint);
+  }
 
  /* Icon options row */
  #iconOptions {
@@ -1474,6 +1591,11 @@ body.dark .font-select {
   .nav-arrow { width: 36px; font-size: 2.2em; }
   .book-title-bar { font-size: 0.82em; }
   #libraryGrid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+  
+  /* Reader container mobile padding */
+  .reader-container {
+    padding: 20px 16px;
+  }
 }
 
 @media (max-width: 420px) {
