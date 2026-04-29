@@ -47,9 +47,9 @@ let hasSwiped = false;
 let currentBookType = "";  // "pdf" | "epub"
 let detectedCharacters = {};
 let characterColors    = {};
-let currentFont = 'default'; // 'default' | 'literata' | 'merriweather' | 'lora' | 'atkinson' | 'opendyslexic'
 let characterStyles    = {}; // per-character style: "underline" | "solid" | "ombre"
 let characterIcons     = {}; // per-character icon: "none" | "star" | "dot" | "triangle" | "diamond"
+let characterDescriptions = {}; // per-character short description
 
 // Highlights storage (per book)
 let highlights = []; // Array of { id, text, bookName, page, type: 'highlight', color, date }
@@ -454,10 +454,11 @@ function showReader(bookName) {
   document.getElementById("reader").style.display    = "flex";
   document.getElementById("currentBookTitle").textContent = bookName.replace(/\.(pdf|epub)$/i, "");
   // Reset character state for new book
-  detectedCharacters = {};
-  characterColors    = {};
-  characterStyles    = {};
-  characterIcons     = {};
+  detectedCharacters      = {};
+  characterColors         = {};
+  characterStyles         = {};
+  characterIcons          = {};
+  characterDescriptions   = {};
   updateCharacterList();
   
   // Load highlights for this book
@@ -550,6 +551,8 @@ document.getElementById("backBtn").addEventListener("click", function() {
 // ============================================================
 function setProgress(pct) {
   document.getElementById("progressFill").style.width = pct + "%";
+  const topFill = document.getElementById("topProgressFill");
+  if (topFill) topFill.style.width = pct + "%";
 }
 
 async function loadPDF(arrayBuffer, filename) {
@@ -1223,6 +1226,7 @@ document.getElementById("settingsPopup").addEventListener("click", function(e) {
 
 const FONT_FAMILIES = {
   default:      'Georgia, "Times New Roman", serif',
+  lexend:       '"Lexend", "Atkinson Hyperlegible", sans-serif',
   literata:     '"Literata", Georgia, serif',
   merriweather: '"Merriweather", Georgia, serif',
   lora:         '"Lora", Georgia, serif',
@@ -1255,26 +1259,51 @@ function applyFontToContents(contents) {
   const old = contents.document.getElementById("sl-font-style");
   if (old) old.remove();
 
-  if (currentFont === 'default') return;
-
   const style = contents.document.createElement("style");
   style.id = "sl-font-style";
 
   let css = '';
+
+  // Handle font-family overrides (if not default)
   if (currentFont === 'opendyslexic') {
+    // Use embedded OpenDyslexic font
     css += DYSLEXIC_FONT_CSS;
-  } else {
-    // embed Google Font link inside the iframe document
+  } else if (currentFont !== 'default') {
+    // Load Google Font and apply
     const existing = contents.document.getElementById("sl-gfont-link");
     if (existing) existing.remove();
     const link = contents.document.createElement("link");
     link.id   = "sl-gfont-link";
     link.rel  = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap";
+    link.href = "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Lexend:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap";
     contents.document.head.appendChild(link);
+    css += `* { font-family: ${FONT_FAMILIES[currentFont]} !important; }`;
   }
 
-  css += `* { font-family: ${FONT_FAMILIES[currentFont]} !important; }`;
+  // Apply typography improvements for all modes (line-height, spacing, alignment)
+  css += `* {
+    line-height: 1.7 !important;
+    letter-spacing: 0.01em !important;
+    text-align: left !important;
+  }
+  p { margin-bottom: 1.2em !important; }
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.3 !important;
+    margin-top: 1.5em !important;
+    margin-bottom: 0.5em !important;
+    letter-spacing: 0.02em !important;
+  }`;
+
+  // Base character highlight styles (soft, with transitions & hover)
+  css += `
+    span[data-char-name] {
+      transition: background-color 0.2s ease, border-bottom-color 0.2s ease, color 0.2s ease, filter 0.2s ease;
+    }
+    span[data-char-name]:hover {
+      filter: brightness(1.1);
+    }
+  `;
+
   style.textContent = css;
   contents.document.head.appendChild(style);
 }
@@ -1547,24 +1576,32 @@ function applySpanStyle(span, color, style, icon) {
   span.removeAttribute("data-char-icon");
 
   if (color) {
+    // Convert hex color to include alpha: append two hex digits for opacity
+    const bgColor = color + "26";     // ~0.15 opacity (soft tint)
+    const borderColor = color + "80"; // ~0.5 opacity for underline
+    const faintBg = color + "0d";     // ~0.05 very faint background
+
     if (style === "solid") {
-      span.style.background    = color;
-      // Use black text for better contrast on vibrant colors in light mode
+      span.style.background    = bgColor;
       span.style.color         = "#000000";
       span.style.textShadow    = "0 0 2px rgba(255,255,255,0.5)";
-      span.style.padding       = "3px 6px";
-      span.style.borderRadius  = "8px"; // More rounded corners
+      span.style.padding       = "2px 4px";
+      span.style.borderRadius  = "3px";
     } else if (style === "ombre") {
-      span.style.backgroundImage  = "linear-gradient(to top, " + color + "dd 0%, transparent 100%)";
+      span.style.backgroundImage  = "linear-gradient(to top, " + bgColor + " 0%, transparent 100%)";
       span.style.backgroundRepeat = "no-repeat";
       span.style.backgroundSize   = "100% 100%";
-      span.style.padding          = "3px 6px";
-      span.style.borderRadius     = "8px"; // More rounded corners
+      span.style.padding          = "2px 4px";
+      span.style.borderRadius     = "3px";
       span.style.color            = "#000000";
     } else {
-      // Full underline style - solid line instead of dashed
-      span.style.borderBottom  = "3px solid " + color;
-      span.style.paddingBottom = "2px";
+      // Underline style: soft bottom tint (like a marker underline)
+      span.style.backgroundImage  = "linear-gradient(to top, " + bgColor + " 0%, transparent 4px)";
+      span.style.backgroundRepeat = "no-repeat";
+      span.style.backgroundSize   = "100% 4px";
+      span.style.backgroundPosition = "bottom";
+      span.style.paddingBottom    = "2px";
+      span.style.borderRadius    = "3px";
     }
   }
 
@@ -2417,6 +2454,10 @@ window.openInlineColorPicker = function openInlineColorPicker(name, x, y) {
   const savedColor = characterColors[name] || "#ff0000";
   document.getElementById("inlineColor").value = savedColor;
   
+  // Set description
+  const savedDesc = characterDescriptions[name] || "";
+  document.getElementById("charDescription").value = savedDesc;
+  
   // Update palette selection
   document.querySelectorAll(".color-swatch").forEach(s => {
     s.classList.toggle("selected", s.dataset.color.toLowerCase() === savedColor.toLowerCase());
@@ -2448,9 +2489,11 @@ document.getElementById("inlineApply").addEventListener("click", function() {
   const iconInput  = document.querySelector('input[name="inlineIcon"]:checked');
   const style = styleInput ? styleInput.value : "underline";
   const icon  = iconInput  ? iconInput.value  : "none";
-  characterColors[inlineTargetChar]  = color;
-  characterStyles[inlineTargetChar]  = style;
-  characterIcons[inlineTargetChar]   = icon;
+  const desc  = document.getElementById("charDescription").value.trim();
+  characterColors[inlineTargetChar]      = color;
+  characterStyles[inlineTargetChar]      = style;
+  characterIcons[inlineTargetChar]       = icon;
+  characterDescriptions[inlineTargetChar] = desc;
   document.getElementById("inlineColorPicker").style.display = "none";
   updateCharacterList();
   if (rendition) {
@@ -2734,56 +2777,131 @@ document.getElementById("hlHighlight").addEventListener("click", function(e) {
 });
 
 // ============================================================
-//  DARK MODE
+//  THEME MODE (LIGHT / DARK / SEPIA)
 // ============================================================
 (function() {
   const btn = document.getElementById("darkModeBtn");
   const homeBtn = document.getElementById("homeDarkModeBtn");
-  const saved = localStorage.getItem("sl_darkMode");
-  if (saved === "1") {
-    document.body.classList.add("dark");
-    const btnLabel = document.querySelector("#darkModeBtn .btn-label");
-    if (btnLabel) btnLabel.textContent = "Dark Mode";
+  const MODES = ["light", "dark", "sepia"];
+  
+  // Load saved mode, with backward-compatible migration from sl_darkMode
+  let saved = localStorage.getItem("sl_themeMode");
+  if (!saved) {
+    const oldDark = localStorage.getItem("sl_darkMode");
+    if (oldDark === "1") saved = "dark";
+    else saved = "light";
   }
-   
-  function toggleDarkMode() {
-    const isDark = document.body.classList.toggle("dark");
-    // Update button labels
+  if (saved === "dark") document.body.classList.add("dark");
+  else if (saved === "sepia") document.body.classList.add("sepia");
+  
+  function updateButtonLabel() {
     const btnLabel = document.querySelector("#darkModeBtn .btn-label");
-    if (btnLabel) btnLabel.textContent = isDark ? "Dark Mode" : "Light Mode";
-    // Icons are toggled via CSS based on body.dark class
-    localStorage.setItem("sl_darkMode", isDark ? "1" : "0");
-    // Re-inject dark background into EPUB iframe if open
+    if (btnLabel) {
+      const isDark = document.body.classList.contains("dark");
+      const isSepia = document.body.classList.contains("sepia");
+      btnLabel.textContent = isDark ? "Dark Mode" : (isSepia ? "Sepia Mode" : "Light Mode");
+    }
+  }
+  updateButtonLabel();
+  
+  function cycleTheme() {
+    // Determine current mode before changing
+    const currentIsDark = document.body.classList.contains("dark");
+    const currentIsSepia = document.body.classList.contains("sepia");
+    
+    // Remove any existing theme class
+    document.body.classList.remove("dark", "sepia");
+    
+    let nextMode;
+    if (currentIsDark) nextMode = "sepia";
+    else if (currentIsSepia) nextMode = "light";
+    else nextMode = "dark"; // light -> dark
+    
+    // Apply new mode
+    if (nextMode === "dark") document.body.classList.add("dark");
+    else if (nextMode === "sepia") document.body.classList.add("sepia");
+    
+    localStorage.setItem("sl_themeMode", nextMode);
+    updateButtonLabel();
+    
+    // Update EPUB iframe if open
     if (rendition) {
       rendition.getContents().forEach(function(contents) {
+        // Remove old dark style if exists
         let style = contents.document.getElementById("sl-dark-style");
-        if (isDark) {
-          if (!style) {
-            style = contents.document.createElement("style");
-            style.id = "sl-dark-style";
-            contents.document.head.appendChild(style);
-          }
-          // Dark mode styles with more visible highlights
+        if (style) style.remove();
+        // Remove old sepia style if exists
+        style = contents.document.getElementById("sl-sepia-style");
+        if (style) style.remove();
+        
+        if (nextMode === "dark") {
+          style = contents.document.createElement("style");
+          style.id = "sl-dark-style";
           style.textContent = `
             body,html{background:#1a1612!important;color:#e8dfd0!important}
             span[data-char-name]{opacity:1!important}
             span[data-char-name][style*="border-bottom"]{border-bottom-color:inherit!important}
           `;
-        } else {
-          if (style) style.remove();
+          contents.document.head.appendChild(style);
+        } else if (nextMode === "sepia") {
+          style = contents.document.createElement("style");
+          style.id = "sl-sepia-style";
+          style.textContent = `
+            body,html{background:#f4ecd8!important;color:#5b4636!important}
+            span[data-char-name]{opacity:1!important}
+          `;
+          contents.document.head.appendChild(style);
         }
       });
     }
   }
   
-  if (btn) btn.addEventListener("click", toggleDarkMode);
-  if (homeBtn) homeBtn.addEventListener("click", toggleDarkMode);
+  if (btn) btn.addEventListener("click", cycleTheme);
+  if (homeBtn) homeBtn.addEventListener("click", cycleTheme);
 })();
 
 // ============================================================
 //  INIT
 // ============================================================
 renderLibrary();
+
+// Immersive scroll: auto-hide/show top & bottom bars on scroll
+(function() {
+  const container = document.querySelector('.reader-container');
+  if (!container) return;
+  let lastScrollTop = 0;
+  const SCROLL_THRESHOLD = 10;
+  
+  container.addEventListener('scroll', function() {
+    const st = container.scrollTop;
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    
+    // Always show bars when at very top or bottom
+    if (st <= 0) {
+      document.getElementById('topBar').classList.remove('hidden');
+      document.getElementById('bottomBar').classList.remove('hidden');
+      lastScrollTop = st;
+      return;
+    }
+    if (st >= maxScroll - 5) {
+      document.getElementById('topBar').classList.remove('hidden');
+      document.getElementById('bottomBar').classList.remove('hidden');
+      lastScrollTop = st;
+      return;
+    }
+    
+    if (st > lastScrollTop + SCROLL_THRESHOLD) {
+      // Scrolling down - hide UI
+      document.getElementById('topBar').classList.add('hidden');
+      document.getElementById('bottomBar').classList.add('hidden');
+    } else if (st < lastScrollTop - SCROLL_THRESHOLD) {
+      // Scrolling up - show UI
+      document.getElementById('topBar').classList.remove('hidden');
+      document.getElementById('bottomBar').classList.remove('hidden');
+    }
+    lastScrollTop = st;
+  });
+})();
 
 // ============================================================
 //  PWA - Service Worker Registration
