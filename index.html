@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="logo/logo-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Coda:wght@400;700&family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Coda:wght@400;700&family=Lexend:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&display=swap" rel="stylesheet">
 
 <!-- PDF.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -80,39 +80,45 @@
   <!-- ========== READER ========== -->
   <div id="reader" style="display:none;">
 
-    <!-- Top bar: Kindle-style with back button, title center, bookmark & settings right -->
-    <div class="top-bar" id="topBar">
-      <button id="backBtn" class="top-btn back-btn" title="Back to library">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      </button>
-      <span id="currentBookTitle" class="book-title-bar"></span>
-      <!-- Minimal bookmark button -->
-      <button id="savePageBtn" class="top-btn bookmark-btn" title="Save position / Add bookmark">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-        </svg>
-      </button>
-      <!-- Highlights button -->
-      <button id="readerHighlightsBtn" class="top-btn" title="View all highlights">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-        </svg>
-      </button>
-      <button id="settingsBtn" class="top-btn" title="Settings">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-      </button>
-    </div>
+     <!-- Top bar: Kindle-style with back button, title center, bookmark & settings right -->
+     <div class="top-bar" id="topBar">
+       <button id="backBtn" class="top-btn back-btn" title="Back to library">
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+       </button>
+       <span id="currentBookTitle" class="book-title-bar"></span>
+       <!-- Minimal bookmark button -->
+       <button id="savePageBtn" class="top-btn bookmark-btn" title="Save position / Add bookmark">
+         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+         </svg>
+       </button>
+       <!-- Highlights button -->
+       <button id="readerHighlightsBtn" class="top-btn" title="View all highlights">
+         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+           <polyline points="14 2 14 8 20 8"></polyline>
+           <line x1="16" y1="13" x2="8" y2="13"></line>
+           <line x1="16" y1="17" x2="8" y2="17"></line>
+         </svg>
+       </button>
+       <button id="settingsBtn" class="top-btn" title="Settings">
+         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+       </button>
+     </div>
+     <!-- Top progress bar (thin) -->
+     <div id="topProgressBar" class="top-progress-bar">
+       <div id="topProgressFill" class="top-progress-fill"></div>
+     </div>
 
-    <!-- Reading area -->
-    <div id="readingArea">
-      <div id="readingContent">
-        <canvas id="pdfCanvas" style="display:none;"></canvas>
-        <div id="epubViewer" style="display:none;"></div>
-      </div>
-    </div>
+     <!-- Reading area -->
+     <div id="readingArea">
+       <div class="reader-container">
+         <div id="readingContent">
+           <canvas id="pdfCanvas" style="display:none;"></canvas>
+           <div id="epubViewer" style="display:none;"></div>
+         </div>
+       </div>
+     </div>
 
     <!-- Bottom bar: progress + navigation arrows + amount read -->
     <div class="bottom-bar" id="bottomBar">
@@ -216,17 +222,18 @@
         </div>
       </section>
 
-      <section>
-        <h3>Font</h3>
-        <select id="fontSelect" class="font-select">
-          <option value="default">Default (Serif)</option>
-          <option value="literata">Literata</option>
-          <option value="merriweather">Merriweather</option>
-          <option value="lora">Lora</option>
-          <option value="atkinson">Atkinson Hyperlegible</option>
-          <option value="opendyslexic">OpenDyslexic</option>
-        </select>
-      </section>
+       <section>
+         <h3>Font</h3>
+         <select id="fontSelect" class="font-select">
+           <option value="default">Default (Serif)</option>
+           <option value="lexend">Lexend</option>
+           <option value="literata">Literata</option>
+           <option value="merriweather">Merriweather</option>
+           <option value="lora">Lora</option>
+           <option value="atkinson">Atkinson Hyperlegible</option>
+           <option value="opendyslexic">OpenDyslexic</option>
+         </select>
+       </section>
 
     </div>
   </div>
@@ -248,16 +255,20 @@
     <label><input type="radio" name="inlineStyle" value="solid"> Full colour</label>
     <label><input type="radio" name="inlineStyle" value="ombre"> Ombre</label>
   </div>
-  <div id="iconOptions">
-    <label><input type="radio" name="inlineIcon" value="none" checked> No icon</label>
-    <label><input type="radio" name="inlineIcon" value="star"> ★ Star</label>
-    <label><input type="radio" name="inlineIcon" value="dot"> ● Dot</label>
-    <label><input type="radio" name="inlineIcon" value="triangle"> ▲ Triangle</label>
-    <label><input type="radio" name="inlineIcon" value="diamond"> ◆ Diamond</label>
-    <label><input type="radio" name="inlineIcon" value="pencil"> ✏️ Pencil</label>
-  </div>
-  <br>
-  <div class="picker-actions">
+   <div id="iconOptions">
+     <label><input type="radio" name="inlineIcon" value="none" checked> No icon</label>
+     <label><input type="radio" name="inlineIcon" value="star"> ★ Star</label>
+     <label><input type="radio" name="inlineIcon" value="dot"> ● Dot</label>
+     <label><input type="radio" name="inlineIcon" value="triangle"> ▲ Triangle</label>
+     <label><input type="radio" name="inlineIcon" value="diamond"> ◆ Diamond</label>
+     <label><input type="radio" name="inlineIcon" value="pencil"> ✏️ Pencil</label>
+   </div>
+   <div id="descriptionOptions">
+     <label for="charDescription">Description</label>
+     <textarea id="charDescription" rows="2" placeholder="Short description (optional)"></textarea>
+   </div>
+   <br>
+   <div class="picker-actions">
     <button id="inlineApply" class="btn-primary">Apply</button>
     <button id="inlineClose" class="btn-ghost">Cancel</button>
   </div>
